@@ -136,7 +136,6 @@ func (c *Client) SendChatCompletionRequest(model string, role string, content st
 				Name:       toolCall.Function.Name,
 				ToolCallId: toolCall.Id,
 			})
-			c.MessageHistory = append(c.MessageHistory, toolMessages...)
 			// toolMessages = append(toolMessages, common.Message{
 			// 	Role:       "tool",
 			// 	Content:    toolResult.(string), // can be dangerous. func signatures, returns must be handled in a better and more solid way
@@ -144,6 +143,7 @@ func (c *Client) SendChatCompletionRequest(model string, role string, content st
 			// 	ToolCallId: toolCall.Id,
 			// })
 		}
+		c.MessageHistory = append(c.MessageHistory, toolMessages...)
 		return c.SendChatCompletionRequest(model, "tool", "")
 	}
 
