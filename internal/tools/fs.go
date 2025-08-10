@@ -23,9 +23,9 @@ func ToolGetCurrentWorkingDirectory() (string, error) {
 //
 // text: pattern to search
 // includeHiddenFiles: bool flag to determine if hidden files are included or not. rg option `-.` is used when enabled
-// daceSensitive: bool flag to determine if search is performed dace sensitive or not. rg option `-s` is used when enabled
+// caseSensitive: bool flag to determine if search is performed dace sensitive or not. rg option `-s` is used when enabled
 // dir: full directory path to perform ripgrep in it
-func ToolGrepText(text string, includeHiddenFiles bool, daceSensitive bool, dir string) (string, error) {
+func ToolGrepText(text string, includeHiddenFiles bool, caseSensitive bool, dir string) (string, error) {
 	var args []string
 	if text == "" {
 		return "", fmt.Errorf("Cannot perform rg for empty string")
@@ -39,7 +39,7 @@ func ToolGrepText(text string, includeHiddenFiles bool, daceSensitive bool, dir 
 	if includeHiddenFiles {
 		args = append(args, "-.")
 	}
-	if daceSensitive {
+	if caseSensitive {
 		args = append(args, "-s")
 	}
 	// final arg is the directory to search
