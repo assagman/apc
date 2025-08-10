@@ -220,5 +220,11 @@ func (c *Client) ExtractAnswerFromChatCompletionResponse(respBytes []byte) (stri
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return "", err
 	}
-	return resp.Candidates[0].Content.Parts[0].Text, nil
+	var answer string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if part.Text != "" {
+			answer += part.Text
+		}
+	}
+	return answer, nil
 }

@@ -44,6 +44,27 @@ func TestAll(prompt string) {
 	}
 }
 
+func TestClient(providerName string, modelName string, prompt string) {
+	client, err := apc.New(providerName)
+	if err != nil {
+		fmt.Printf("\n%v\n", err)
+		fmt.Println("---")
+	}
+	respBytes, err := client.SendChatCompletionRequest(modelName, "user", prompt)
+	if err != nil {
+		fmt.Printf("\n%v\n", err)
+		fmt.Println("---")
+	}
+	answer, err := client.ExtractAnswerFromChatCompletionResponse(respBytes)
+	if err != nil {
+		fmt.Printf("\n%v\n", err)
+		fmt.Println("---")
+	}
+	fmt.Printf("%s\n\n", answer)
+	fmt.Println("---")
+}
+
 func main() {
-	TestAll("which module contains dynamic function execution implementation in the current Go project in CWD. Be concise, return module filename only")
+	// TestAll("which module contains dynamic function execution implementation in the current Go project in CWD. Be concise, return module filename only")
+	TestClient("google", "gemini-2.5-pro", "what is the purpose of generic in golang and howw to use them? be concise, provide 4 exxample.")
 }
