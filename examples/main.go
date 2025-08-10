@@ -1,13 +1,9 @@
 package main
 
 import (
-	// "context"
-
 	"fmt"
 
 	"github.com/assagman/apc"
-	// "github.com/assagman/apc/internal/providers"
-	// "github.com/assagman/apc/internal/http"
 )
 
 var providerConfig = map[string]string{
