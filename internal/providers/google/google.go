@@ -12,9 +12,14 @@ import (
 
 const ChatCompletionRequestUrlTemplate = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
 
+type Function struct {
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"args,omitempty"`
+}
+
 type Part struct {
-	Text         string          `json:"text,omitempty"`
-	FunctionCall *tools.Function `json:"functionCall,omitempty"`
+	Text         string    `json:"text,omitempty"`
+	FunctionCall *Function `json:"functionCall,omitempty"`
 }
 
 type Content struct {
@@ -133,20 +138,21 @@ func (c *Client) SendChatCompletionRequest(model string, role string, content st
 		// fmt.Printf("tool: %s\n", toolCall.Name)
 
 		argsMap := make(map[string]any)
-		if toolCall.Arguments != nil {
-			var argsStr string
-
-			// Unmarshal the RawMessage into the map
-			// fmt.Println("Unmarshalling arguments RawMessages to string")
-			err := json.Unmarshal([]byte(toolCall.Arguments), &argsStr)
-			if err != nil {
-				fmt.Printf("Failed to unmarshal toolCall.Function.Arguments. Value: %s\n", string(toolCall.Arguments))
-				return nil, err
-			}
-
+		if toolCall.Arguments != nil && string(toolCall.Arguments) != "{}" {
+			fmt.Printf("tool: %s\n", toolCall.Arguments)
+			// var argsStr string
+			//
+			// // Unmarshal the RawMessage into the map
+			// // fmt.Println("Unmarshalling arguments RawMessages to string")
+			// err := json.Unmarshal([]byte(toolCall.Arguments), &argsStr)
+			// if err != nil {
+			// 	fmt.Printf("Failed to unmarshal toolCall.Function.Arguments. Value: %s\n", string(toolCall.Arguments))
+			// 	return nil, err
+			// }
+			//
 			// Unmarshal the string into the map
 			// fmt.Println("Unmarshalling arguments strings to map")
-			errr := json.Unmarshal([]byte(argsStr), &argsMap)
+			errr := json.Unmarshal([]byte(toolCall.Arguments), &argsMap)
 			if errr != nil {
 				return nil, errr
 			}

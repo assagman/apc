@@ -3,7 +3,7 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	"os"
 
 	"github.com/assagman/apc/internal/http"
@@ -156,20 +156,20 @@ func (c *Client) SendChatCompletionRequest(model string, role string, content st
 		for _, toolCall := range toolCalls {
 			argsMap := make(map[string]any)
 			if toolCall.ToolInput != nil && string(toolCall.ToolInput) != "{}" {
-				// fmt.Printf("tool: %s\n", toolCall.Function.Name)
-				var argsStr string
-
-				// Unmarshal the RawMessage into the map
-				// fmt.Println("Unmarshalling arguments RawMessages to string")
-				err := json.Unmarshal([]byte(toolCall.ToolInput), &argsStr)
-				if err != nil {
-					fmt.Printf("Failed to unmarshal toolCall.ToolInput. Value: %s\n", string(toolCall.ToolInput))
-					return nil, err
-				}
+				// // fmt.Printf("tool: %s\n", toolCall.Function.Name)
+				// var argsStr string
+				//
+				// // Unmarshal the RawMessage into the map
+				// // fmt.Println("Unmarshalling arguments RawMessages to string")
+				// err := json.Unmarshal([]byte(toolCall.ToolInput), &argsStr)
+				// if err != nil {
+				// 	fmt.Printf("Failed to unmarshal toolCall.ToolInput. Value: %s\n", string(toolCall.ToolInput))
+				// 	return nil, err
+				// }
 
 				// Unmarshal the string into the map
 				// fmt.Println("Unmarshalling arguments strings to map")
-				errr := json.Unmarshal([]byte(argsStr), &argsMap)
+				errr := json.Unmarshal([]byte(toolCall.ToolInput), &argsMap)
 				if errr != nil {
 					return nil, errr
 				}
