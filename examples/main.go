@@ -14,7 +14,7 @@ var providerConfig = map[string]string{
 	"openrouter": "z-ai/glm-4.5",
 	"groq":       "moonshotai/kimi-k2-instruct",
 	"cerebras":   "gpt-oss-120b",
-	"openai":     "gpt-5-nano",
+	"openai":     "gpt-5",
 	"anthropic":  "claude-sonnet-4-20250514",
 	"google":     "gemini-2.5-flash",
 }
