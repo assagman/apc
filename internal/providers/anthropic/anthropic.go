@@ -28,7 +28,6 @@ const (
 
 type Provider struct {
 	Name         string
-	ApiKey       string
 	Endpoint     string
 	Model        string
 	SystemPrompt string
@@ -89,7 +88,6 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 	CheckModelName(model)
 	return &Provider{
 		Name:         "anthropic",
-		ApiKey:       os.Getenv("ANTHROPIC"),
 		Endpoint:     chatCompletionRequestUrl,
 		Model:        model,
 		SystemPrompt: systemPrompt,
