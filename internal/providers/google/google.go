@@ -98,7 +98,7 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 	}, nil
 }
 
-func (p *Provider) GetApiKey() string { return os.Getenv("OPENROUTER_API_KEY") }
+func (p *Provider) GetApiKey() string { return os.Getenv("GEMINI_API_KEY") }
 func (p *Provider) GetEndpoint() string {
 	return fmt.Sprintf(chatCompletionRequestUrlTemplate, p.Model)
 }
