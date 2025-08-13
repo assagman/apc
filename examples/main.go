@@ -22,7 +22,7 @@ var providerConfig = map[string]string{
 func TestAll(prompt string) {
 	for providerName, modelName := range providerConfig {
 		fmt.Println("---")
-		client, err := apc.New(providerName, modelName, "")
+		client, err := apc.New(providerName, modelName, "Always response in json format")
 		if err != nil {
 			fmt.Printf("\n%v\n", err)
 			fmt.Println("---")
