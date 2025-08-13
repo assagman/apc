@@ -62,13 +62,8 @@ func TestAll(prompt string) {
 // 	fmt.Println("---")
 // }
 
-func TestLoop() {
-	// client, err := apc.New("google", "gemini-2.5-flash", "Always write your response in bullet list")
-	// client, err := apc.New("anthropic", "claude-sonnet-4-20250514", "Always write your response in bullet list")
-	// client, err := apc.New("groq", "moonshotai/kimi-k2-instruct", "Always write your response in well markdown rendered format")
-	// client, err := apc.New("openai", "gpt-5", "Always write your response in bullet list")
-	// client, err := apc.New("openrouter", "moonshotai/kimi-k2", "Always write your response in json format")
-	client, err := apc.New("cerebras", "qwen-3-235b-a22b-instruct-2507", "Always write your response in well markdown rendered format")
+func TestLoop(providerName string, modelName string) {
+	client, err := apc.New(providerName, modelName, "Always write your response in bullet list")
 	if err != nil {
 		fmt.Printf("\n%v\n", err)
 		fmt.Println("---")
@@ -99,10 +94,13 @@ func main() {
 	fmt.Println("Starting examples main")
 	if err := apc.LoadEnv(".env"); err != nil {
 		fmt.Println(err.Error())
+		return
 	}
 
-	// TestAll("Why ripgrep is faster than grep")
-	TestLoop()
+	// TestAll("Explain pointers and references in Golang")
+	TestAll("Get cwd")
+	// TestLoop("google", "gemini-2.5-flash")
+	// TestLoop("anthropic", "claude-sonnet-4-20250514")
 
 	// client, err := apc.New("openrouter", "google/gemini-2.5-flash", "")
 	// client, err := apc.New("google", "gemini-2.5-flash", "")

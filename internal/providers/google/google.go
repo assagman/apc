@@ -110,6 +110,10 @@ func (p *Provider) GetHeaders() map[string]string {
 }
 
 func (p *Provider) GetSystemPrompt() *SystemInstruction {
+	if p.SystemPrompt == "" {
+		return nil
+	}
+
 	return &SystemInstruction{
 		Parts: []Part{
 			{
@@ -196,7 +200,7 @@ func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (strin
 	if err != nil {
 		return "", nil
 	}
-	logger.PrintV(p.History)
+	// logger.PrintV(p.History)
 
 	answer := finalResp.Candidates[0].Content.Parts[0].Text
 	return answer, nil
