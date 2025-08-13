@@ -1,15 +1,50 @@
 package environ
 
 import (
-	// "dac/pkg/logger"
 	"fmt"
 	"os"
+	"path"
 	"strings"
+
+	"github.com/assagman/apc/internal/logger"
 )
 
-func LoadEnv() error {
+func CheckEnvFile(envFile string) (bool, error) {
+	if envFile == "" {
+		logger.Warning("Empty env filename")
+		return false, nil
+	}
+	if !path.IsAbs(envFile) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			logger.Error("Failed to get CWD")
+		}
+		envFile = path.Join(cwd, envFile)
+	}
+	stat, err := os.Stat(envFile)
+	if os.IsNotExist(err) {
+		logger.Warning("Given env file `%s` does not exist.")
+		return false, nil
+	}
+	if stat.IsDir() {
+		logger.Error("Given env file is a directory")
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func LoadEnv(envFile string) error {
+	ok, err := CheckEnvFile(envFile)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		logger.Warning("Invalid env file `%s`. Falling back to `./.env", envFile)
+		envFile = ".env"
+	}
 	// logger.Debug("Reading .env")
-	dotenvBytes, readFileErr := os.ReadFile(".env")
+	dotenvBytes, readFileErr := os.ReadFile(envFile)
 	if readFileErr != nil {
 		// logger.Warning("Unable to read .env %s.", readFileErr.Error())
 		return readFileErr
