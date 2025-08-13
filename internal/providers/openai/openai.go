@@ -218,13 +218,6 @@ func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (strin
 	if err != nil {
 		return "", err
 	}
-	// DEBUG
-	b, e := json.MarshalIndent(finalResp, "", "  ")
-	if e != nil {
-		return "", e
-	}
-	println(string(b))
-	// DEBUG
 
 	answer, err := finalResp.Choices[0].Message.GetContentAsString()
 	if err != nil {
@@ -256,14 +249,12 @@ func (p *Provider) SendToolResult(ctx context.Context, f ToolCall) (*Response, e
 			return nil, errr
 		}
 	}
-	// ======================================================== Parse function arguments
 
 	// ======================================================== Execute tool
 	toolResult, toolErr := tools.ExecTool(f.Function.Name, argsMap)
 	if toolErr != nil {
 		return nil, toolErr
 	}
-	// ======================================================== Execute tool
 
 	// ======================================================== CONTENT
 	content := Message{
@@ -271,7 +262,6 @@ func (p *Provider) SendToolResult(ctx context.Context, f ToolCall) (*Response, e
 		Content:    toolResult.(string),
 		ToolCallId: f.Id,
 	}
-	// ======================================================== CONTENT
 
 	// ======================================================== Request Construction
 	p.History = append(p.History, content)
@@ -280,7 +270,6 @@ func (p *Provider) SendToolResult(ctx context.Context, f ToolCall) (*Response, e
 		Tools:    p.GetTools(),
 		Messages: p.History,
 	}
-	// ======================================================== Request Construction
 
 	resp, err := p.SendRequest(ctx, req)
 	if err != nil {
@@ -296,7 +285,6 @@ func (p *Provider) SendToolResult(ctx context.Context, f ToolCall) (*Response, e
 	if finalResp.Choices[0].FinishReason == stopReasonStop {
 		return finalResp, err
 	}
-	// ======================================================== Check finish/stop reason for tool call
 
 	return nil, fmt.Errorf("[SendToolResult] Unexpected finish reason: %s", finalResp.Choices[0].FinishReason)
 }

@@ -157,21 +157,12 @@ func (p *Provider) SendRequest(ctx context.Context, req Request) (*Response, err
 		return nil, err
 	}
 
-	// b, err := json.MarshalIndent(req, "", "  ")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// println(string(b))
-
-	// ======================================================== Request Conversion to bytes
-
 	// ======================================================== REST API CALL
 	c := http.New()
 	respBytes, err := c.Post(ctx, p.Endpoint, p.GetHeaders(), reqBytes)
 	if err != nil {
 		return nil, err
 	}
-	// ======================================================== REST API CALL
 
 	// ======================================================== Response conversion from bytes
 	var resp Response
@@ -179,16 +170,8 @@ func (p *Provider) SendRequest(ctx context.Context, req Request) (*Response, err
 		fmt.Println("x")
 		return nil, err
 	}
-	// DEBUG
-	// b, e := json.MarshalIndent(resp, "", "  ")
-	// if e != nil {
-	// 	return nil, err
-	// }
-	// println(string(b))
-	// DEBUG
 
 	p.History = append(p.History, resp.Choices[0].Message)
-	// ======================================================== Response conversion from bytes
 	return &resp, nil
 }
 
@@ -223,13 +206,6 @@ func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (strin
 	if err != nil {
 		return "", err
 	}
-	// DEBUG
-	b, e := json.MarshalIndent(p.History, "", "  ")
-	if e != nil {
-		return "", e
-	}
-	println(string(b))
-	// DEBUG
 
 	answer, err := finalResp.Choices[0].Message.GetContentAsString()
 	if err != nil {

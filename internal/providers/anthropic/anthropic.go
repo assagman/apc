@@ -204,13 +204,6 @@ func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (strin
 	if err != nil {
 		return "", err
 	}
-	// // DEBUG
-	// b, e := json.MarshalIndent(p.History, "", "  ")
-	// if e != nil {
-	// 	return "", e
-	// }
-	// println(string(b))
-	// // DEBUG
 
 	answer := finalResp.Content[0].Text
 	return answer, nil
