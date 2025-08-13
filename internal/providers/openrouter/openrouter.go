@@ -82,12 +82,15 @@ func CheckModelName(model string) error {
 
 func New(model string, systemPrompt string) (core.IProvider, error) {
 	CheckModelName(model)
-	return &Provider{
+	p := &Provider{
 		Name:         "openrouter",
 		Endpoint:     chatCompletionRequestUrl,
 		Model:        model,
 		SystemPrompt: systemPrompt,
-	}, nil
+		History:      make([]Message, 0),
+	}
+	p.History = append(p.History, p.ConstructSystemPromptMessage())
+	return p, nil
 }
 
 func (p *Provider) GetName() string {
@@ -137,13 +140,13 @@ func (p *Provider) GetTools() *Tools {
 	return &tools
 }
 
-func (p *Provider) ConstructSystemPromptMessage(prompt string) Message {
+func (p *Provider) ConstructSystemPromptMessage() Message {
 	return Message{
 		Role: roleSys,
 		Content: []Part{
 			{
 				Type: "text",
-				Text: prompt,
+				Text: p.SystemPrompt,
 			},
 		},
 	}
@@ -200,7 +203,6 @@ func (p *Provider) HandleToolCalls(ctx context.Context, resp Response) (*Respons
 }
 
 func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (string, error) {
-	p.History = append(p.History, p.ConstructSystemPromptMessage(p.SystemPrompt))
 	p.History = append(p.History, p.ConstructUserPromptMessage(userPrompt))
 	req := Request{
 		Model:    p.Model,

@@ -36,39 +36,6 @@ type Provider struct {
 	History      []Message
 }
 
-func CheckModelName(model string) error {
-	models := []string{"moonshotai/kimi-k2", "google/gemini-2.5-flash"}
-	if !slices.Contains(models, model) {
-		return fmt.Errorf("UnsupportedModelName: `%s`", model)
-	}
-	return nil
-}
-func New(model string, systemPrompt string) (core.IProvider, error) {
-	CheckModelName(model)
-	return &Provider{
-		Name:         "openai",
-		Endpoint:     chatCompletionRequestUrl,
-		Model:        model,
-		SystemPrompt: systemPrompt,
-		History:      make([]Message, 0),
-	}, nil
-}
-
-func (p *Provider) GetName() string {
-	return p.Name
-}
-
-func (p *Provider) GetApiKey() string { return os.Getenv("OPENAI_API_KEY") }
-
-func (p *Provider) GetEndpoint() string { return chatCompletionRequestUrl }
-
-func (p *Provider) GetHeaders() map[string]string {
-	return map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": "Bearer " + p.GetApiKey(),
-	}
-}
-
 type Part struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
@@ -87,6 +54,57 @@ type Message struct {
 	Content    any        `json:"content"` // req: string or array, resp: string or null
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallId string     `json:"tool_call_id,omitempty"`
+}
+
+type Request struct {
+	Model    string    `json:"model"`
+	Messages []Message `json:"messages"`
+	Tools    *Tools    `json:"tools"`
+}
+
+type Choice struct {
+	Message      Message `json:"message"`
+	FinishReason string  `json:"finish_reason"`
+}
+
+type Response struct {
+	Choices []Choice `json:"choices"`
+}
+
+func CheckModelName(model string) error {
+	models := []string{"moonshotai/kimi-k2", "google/gemini-2.5-flash"}
+	if !slices.Contains(models, model) {
+		return fmt.Errorf("UnsupportedModelName: `%s`", model)
+	}
+	return nil
+}
+func New(model string, systemPrompt string) (core.IProvider, error) {
+	CheckModelName(model)
+	p := &Provider{
+		Name:         "openai",
+		Endpoint:     chatCompletionRequestUrl,
+		Model:        model,
+		SystemPrompt: systemPrompt,
+		History:      make([]Message, 0),
+	}
+	p.History = append(p.History, p.ConstructSystemPromptMessage())
+	return p, nil
+
+}
+
+func (p *Provider) GetName() string {
+	return p.Name
+}
+
+func (p *Provider) GetApiKey() string { return os.Getenv("OPENAI_API_KEY") }
+
+func (p *Provider) GetEndpoint() string { return chatCompletionRequestUrl }
+
+func (p *Provider) GetHeaders() map[string]string {
+	return map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": "Bearer " + p.GetApiKey(),
+	}
 }
 
 func (m *Message) GetContentAsString() (string, error) {
@@ -109,21 +127,6 @@ func (m *Message) GetContentAsArray() ([]Part, error) {
 	return nil, fmt.Errorf("[GetContentAsString: []Part cast failed]")
 }
 
-type Request struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Tools    *Tools    `json:"tools"`
-}
-
-type Choice struct {
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
-}
-
-type Response struct {
-	Choices []Choice `json:"choices"`
-}
-
 func (p *Provider) GetTools() *Tools {
 	fsTools, err := tools.GetFsTools()
 	if err != nil {
@@ -136,13 +139,13 @@ func (p *Provider) GetTools() *Tools {
 	return &tools
 }
 
-func (p *Provider) ConstructSystemPromptMessage(prompt string) Message {
+func (p *Provider) ConstructSystemPromptMessage() Message {
 	return Message{
 		Role: roleSys,
 		Content: []Part{
 			{
 				Type: "text",
-				Text: prompt,
+				Text: p.SystemPrompt,
 			},
 		},
 	}
@@ -201,7 +204,6 @@ func (p *Provider) HandleToolCalls(ctx context.Context, resp Response) (*Respons
 }
 
 func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (string, error) {
-	p.History = append(p.History, p.ConstructSystemPromptMessage(p.SystemPrompt))
 	p.History = append(p.History, p.ConstructUserPromptMessage(userPrompt))
 	req := Request{
 		Model:    p.Model,
