@@ -202,7 +202,11 @@ func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (strin
 	}
 	// logger.PrintV(p.History)
 
-	answer := finalResp.Candidates[0].Content.Parts[0].Text
+	var answer = ""
+	for _, part := range finalResp.Candidates[0].Content.Parts {
+		answer += part.Text
+	}
+
 	return answer, nil
 }
 
