@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -113,3 +114,11 @@ func Info(msg string, args ...any)     { L.Info(msg, args...) }
 func Warning(msg string, args ...any)  { L.Warning(msg, args...) }
 func Error(msg string, args ...any)    { L.Error(msg, args...) }
 func Critical(msg string, args ...any) { L.Critical(msg, args...) }
+
+func PrintV(v any) {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		L.Warning("PrintV failed. %+v", v)
+	}
+	L.Debug(string(b))
+}
