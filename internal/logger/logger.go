@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,8 @@ const (
 	colorOrange = "\033[38;5;208m" // ANSI code for orange
 	colorRed    = "\033[31m"
 )
+
+var PrintMutex sync.Mutex
 
 // Logger is a simple custom logger
 type Logger struct {
@@ -76,6 +79,8 @@ func (l *Logger) log(level LogLevel, msg string, args ...any) {
 
 	// Format and write the log message
 	logLine := fmt.Sprintf("%s[%s] [%s] %s%s\n", color, timestamp, severity, msg, colorReset)
+	PrintMutex.Lock()
+	defer PrintMutex.Unlock()
 	fmt.Fprint(l.writer, logLine)
 }
 

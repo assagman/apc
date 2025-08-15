@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 
+	// "github.com/assagman/apc/internal/core"
 	"github.com/assagman/apc/internal/core"
 	"github.com/assagman/apc/internal/http"
 	"github.com/assagman/apc/internal/logger"
@@ -98,6 +99,10 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 	}, nil
 }
 
+func (p *Provider) SetupChannels(ctx context.Context) {
+
+}
+
 func (p *Provider) GetApiKey() string { return os.Getenv("GEMINI_API_KEY") }
 func (p *Provider) GetEndpoint() string {
 	return fmt.Sprintf(chatCompletionRequestUrlTemplate, p.Model)
@@ -109,33 +114,172 @@ func (p *Provider) GetHeaders() map[string]string {
 	}
 }
 
-func (p *Provider) GetSystemPrompt() *SystemInstruction {
-	if p.SystemPrompt == "" {
-		return nil
+func (p *Provider) AppendMessageHistory(msg core.GenericMessage) error {
+	message, ok := msg.(Content)
+	if !ok {
+		return fmt.Errorf("[AppendMessageHistory] Failed to cast core.GenericMessage -> %s.Message", p.Name)
 	}
 
-	return &SystemInstruction{
-		Parts: []Part{
-			{
-				Text: p.SystemPrompt,
-			},
-		},
+	p.History = append(p.History, message)
+	return nil
+}
+
+func (p *Provider) FinishReasonStop() string { return finishReasonStop }
+
+func (p *Provider) FinishReasonToolCall() string { return finishReasonStop }
+
+func (p *Provider) GetAnswerFromResponse(resp core.GenericResponse) (string, error) {
+	response, ok := resp.(Response)
+	if !ok {
+		return "", fmt.Errorf("[GetAnswerFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
+	}
+	answer := ""
+	for _, part := range response.Candidates[0].Content.Parts {
+		answer += part.Text
+	}
+	return answer, nil
+}
+
+func (p *Provider) GetFinishReasonFromResponse(resp core.GenericResponse) (string, error) {
+	response, ok := resp.(Response)
+	if !ok {
+		return "", fmt.Errorf("[GetFinishReasonFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
+	}
+	return response.Candidates[0].FinishReason, nil
+}
+
+func (p *Provider) GetMessageFromResponse(resp core.GenericResponse) (core.GenericMessage, error) {
+	response, ok := resp.(Response)
+	if !ok {
+		return nil, fmt.Errorf("[GetMessageFromResponse] Failed to cast core.GenericResponse -> %s.Response\n", p.Name)
+	}
+	return response.Candidates[0].Content, nil
+}
+
+func (p *Provider) GetToolCallsFromResponse(resp core.GenericResponse) ([]tools.ToolCall, error) {
+	response, ok := resp.(Response)
+	if !ok {
+		return nil, fmt.Errorf("[GetToolCallsFromResponse] Failed to cast core.GenericResponse -> %s.Response.", p.Name)
+	}
+	var toolCalls []tools.ToolCall
+	for _, part := range response.Candidates[0].Content.Parts {
+		if part.FunctionCall != nil {
+			toolCall := tools.ToolCall{
+				Id:   part.FunctionCall.Id,
+				Type: "", // no type in google, just passing
+				Function: tools.Function{
+					Name:      part.FunctionCall.Name,
+					Arguments: part.FunctionCall.Arguments,
+				},
+			}
+			toolCalls = append(toolCalls, toolCall)
+		}
+
+	}
+	return toolCalls, nil
+}
+
+func (p *Provider) GetMessageHistory() any {
+	return p.History
+}
+
+func (p *Provider) IsSenderRole(msg core.GenericMessage) (bool, error) {
+	message, ok := msg.(Content)
+	if !ok {
+		return false, fmt.Errorf("[IsSenderRole] Failed to cast core.GenericMessage -> %s.Content", p.Name)
+	}
+	senderRoles := []string{roleUser}
+	if slices.Contains(senderRoles, message.Role) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (p *Provider) IsToolCall(genericResponse core.GenericResponse) (bool, error) {
+	resp, ok := genericResponse.(Response)
+	if !ok {
+		return false, fmt.Errorf("[GetToolCallsFromResponse] Failed to cast core.GenericResponse -> %s.Response.", p.Name)
+	}
+	finishReason, err := p.GetFinishReasonFromResponse(resp)
+	if err != nil {
+		return false, err
+	}
+	switch finishReason {
+	case p.FinishReasonStop():
+		for _, part := range resp.Candidates[0].Content.Parts {
+			if part.FunctionCall != nil {
+				return true, nil
+			}
+		}
+		return false, nil
+	default:
+		return false, fmt.Errorf("Unexpected finish reason: %s", finishReason)
 	}
 }
 
-func (p *Provider) GetTools() *Tools {
+func (p *Provider) IsToolCallValid(toolCall tools.ToolCall) (bool, error) {
+	if toolCall.Function.Name != "" {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (p *Provider) NewRequest() (core.GenericRequest, error) {
+	return Request{
+		SystemInstruction: p.GetSystemPrompt(),
+		Tools:             p.GetToolsAdapter(p.GetTools()),
+		Contents:          p.History,
+	}, nil
+}
+
+func (p *Provider) GetTools() *[]tools.Tool {
 	fsTools, err := tools.GetFsTools()
 	if err != nil {
 		logger.Warning("Failed to get fs tools")
 	}
-	tools := &Tools{}
+	tools := make([]tools.Tool, 0)
 	for _, fsTool := range fsTools {
-		tools.FunctionDeclarations = append(tools.FunctionDeclarations, Tool(fsTool.Function))
+		tools = append(tools, fsTool)
 	}
-	return tools
+	return &tools
 }
 
-func (p *Provider) ConstructContentFomUserPrompt(prompt string) Content {
+func (p *Provider) GetToolsAdapter(genericTools *[]tools.Tool) *Tools {
+	tools := Tools{}
+	tools.FunctionDeclarations = make([]Tool, 0)
+	for _, fsTool := range *genericTools {
+		tools.FunctionDeclarations = append(tools.FunctionDeclarations, Tool{
+			Name:        fsTool.Function.Name,
+			Description: fsTool.Function.Description,
+			Parameters:  fsTool.Function.Parameters,
+		})
+	}
+	return &tools
+}
+
+func (p *Provider) ConstructSystemPromptMessage() Content {
+	return Content{} // TODO: No sys msg in anthropic, it's at top level
+}
+
+func (p *Provider) ConstructToolMessage(tooCall tools.ToolCall, toolResult string) core.GenericMessage {
+	return Content{
+		Role: roleUser,
+		Parts: []Part{
+			{
+				FunctionResponse: &FunctionResponse{
+					Id:   tooCall.Id,
+					Name: tooCall.Function.Name,
+					Response: map[string]any{
+						"result": toolResult,
+					},
+				},
+			},
+		},
+	}
+
+}
+
+func (p *Provider) ConstructUserPromptMessage(prompt string) core.GenericMessage {
 	return Content{
 		Role: roleUser,
 		Parts: []Part{
@@ -146,7 +290,7 @@ func (p *Provider) ConstructContentFomUserPrompt(prompt string) Content {
 	}
 }
 
-func (p *Provider) SendRequest(ctx context.Context, req Request) (*Response, error) {
+func (p *Provider) SendRequest(ctx context.Context, req core.GenericRequest) (core.GenericResponse, error) {
 	reqBytes, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -162,102 +306,20 @@ func (p *Provider) SendRequest(ctx context.Context, req Request) (*Response, err
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, err
 	}
-	p.History = append(p.History, resp.Candidates[0].Content)
-	return &resp, nil
+
+	return resp, nil
 }
 
-func (p *Provider) HandleToolCalls(ctx context.Context, resp Response) (*Response, error) {
-	if resp.Candidates[0].FinishReason == finishReasonStop {
-		// means everything is OK
-
-		if resp.Candidates[0].Content.Parts[0].FunctionCall != nil {
-			var err error
-			finalResp, err := p.SendToolResult(ctx, *resp.Candidates[0].Content.Parts[0].FunctionCall)
-			if err != nil {
-				return nil, err
-			}
-			p.History = append(p.History, finalResp.Candidates[0].Content)
-			return finalResp, nil
-		}
-	}
-	return &resp, nil
-}
-
-func (p *Provider) SendUserPrompt(ctx context.Context, userPrompt string) (string, error) {
-	p.History = append(p.History, p.ConstructContentFomUserPrompt(userPrompt))
-	req := Request{
-		SystemInstruction: p.GetSystemPrompt(),
-		Tools:             p.GetTools(),
-		Contents:          p.History,
+func (p *Provider) GetSystemPrompt() *SystemInstruction {
+	if p.SystemPrompt == "" {
+		return nil
 	}
 
-	resp, err := p.SendRequest(ctx, req)
-	if err != nil {
-		return "", err
-	}
-
-	finalResp, err := p.HandleToolCalls(ctx, *resp)
-	if err != nil {
-		return "", nil
-	}
-	// logger.PrintV(p.History)
-
-	var answer = ""
-	for _, part := range finalResp.Candidates[0].Content.Parts {
-		answer += part.Text
-	}
-
-	return answer, nil
-}
-
-func (p *Provider) SendToolResult(ctx context.Context, f FunctionCall) (*Response, error) {
-	var argsMap = make(map[string]any)
-	if f.Arguments != nil && string(f.Arguments) != "{}" {
-
-		// Unmarshal the string into the map
-		// fmt.Println("Unmarshalling arguments strings to map")
-		errr := json.Unmarshal([]byte(f.Arguments), &argsMap)
-		if errr != nil {
-			return nil, errr
-		}
-	}
-
-	toolResult, toolErr := tools.ExecTool(f.Name, argsMap)
-	if toolErr != nil {
-		return nil, toolErr
-	}
-
-	part := Part{
-		FunctionResponse: &FunctionResponse{
-			Id:   f.Id,
-			Name: f.Name,
-			Response: map[string]any{
-				"result": toolResult,
+	return &SystemInstruction{
+		Parts: []Part{
+			{
+				Text: p.SystemPrompt,
 			},
 		},
 	}
-	content := Content{
-		Role:  roleUser,
-		Parts: []Part{part},
-	}
-
-	p.History = append(p.History, content)
-
-	req := Request{
-		SystemInstruction: p.GetSystemPrompt(),
-		Tools:             p.GetTools(),
-		Contents:          p.History,
-	}
-
-	resp, err := p.SendRequest(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	finalResp, err := p.HandleToolCalls(ctx, *resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return finalResp, nil
 }

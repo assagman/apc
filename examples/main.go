@@ -11,7 +11,7 @@ import (
 )
 
 var providerConfig = map[string]string{
-	"openrouter": "z-ai/glm-4.5",
+	"openrouter": "qwen/qwen3-coder",
 	"groq":       "moonshotai/kimi-k2-instruct",
 	"cerebras":   "gpt-oss-120b",
 	"openai":     "gpt-5",
@@ -25,56 +25,31 @@ func TestAll(prompt string) {
 		client, err := apc.New(providerName, modelName, "Always response in json format")
 		if err != nil {
 			fmt.Printf("\n%v\n", err)
-			fmt.Println("---")
 			continue
 		}
-		fmt.Printf("%s —> ", providerName)
+		fmt.Printf("%s —> \n", providerName)
 		answer, err := client.Complete(context.TODO(), prompt)
 		if err != nil {
 			fmt.Printf("failed:\n\n")
 			fmt.Printf("\n%v\n", err)
-			fmt.Println("---")
 			continue
 		}
 		fmt.Printf("%s\n\n", answer)
-		fmt.Println("---")
 	}
 }
-
-//
-// func TestClient(providerName string, modelName string, prompt string) {
-// 	client, err := apc.New(providerName)
-// 	if err != nil {
-// 		fmt.Printf("\n%v\n", err)
-// 		fmt.Println("---")
-// 	}
-// 	respBytes, err := client.SendChatCompletionRequest(modelName, "user", prompt)
-// 	if err != nil {
-// 		fmt.Printf("\n%v\n", err)
-// 		fmt.Println("---")
-// 	}
-// 	answer, err := client.ExtractAnswerFromChatCompletionResponse(respBytes)
-// 	if err != nil {
-// 		fmt.Printf("\n%v\n", err)
-// 		fmt.Println("---")
-// 	}
-// 	fmt.Printf("%s\n\n", answer)
-// 	fmt.Println("---")
-// }
 
 func TestLoop(providerName string, modelName string) {
 	client, err := apc.New(providerName, modelName, "Always write your response in bullet list")
 	if err != nil {
 		fmt.Printf("\n%v\n", err)
-		fmt.Println("---")
 		return
 	}
 	for {
 		var prompt string
 		fmt.Print(">> Prompt: ")
 		reader := bufio.NewReader(os.Stdin)
-		prompt, err := reader.ReadString('!')
-		prompt = strings.TrimRight(prompt, "!")
+		prompt, err := reader.ReadString('±')
+		prompt = strings.TrimRight(prompt, "±")
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
@@ -83,10 +58,9 @@ func TestLoop(providerName string, modelName string) {
 		if err != nil {
 			fmt.Printf("failed:\n\n")
 			fmt.Printf("\n%v\n", err)
-			fmt.Println("---")
 			continue
 		}
-		fmt.Printf("%s\n\n", answer)
+		fmt.Printf("[AI]:\n%s\n\n", answer)
 	}
 }
 
@@ -97,25 +71,17 @@ func main() {
 		return
 	}
 
-	// TestAll("Explain pointers and references in Golang")
-	TestAll("Get cwd")
-	// TestLoop("google", "gemini-2.5-flash")
-	// TestLoop("anthropic", "claude-sonnet-4-20250514")
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
-	// client, err := apc.New("openrouter", "google/gemini-2.5-flash", "")
-	// client, err := apc.New("google", "gemini-2.5-flash", "")
-	// client, err := apc.New("groq", "moonshotai/kimi-k2-instruct", "")
-	// client, err := apc.New("openai", "gpt-5", "")
-	// client, err := apc.New("anthropic", "claude-sonnet-4-20250514", "")
-	// client, err := apc.New("cerebras", "gpt-oss-120b", "")
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// 	return
-	// }
-	//
-	// answer, err := client.Complete(context.Background(), "who is einstein?")
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// }
-	// println(answer)
+	// TestLoop("openai", "gpt-4o")
+	// TestLoop("groq", "moonshotai/kimi-k2-instruct")
+	// TestLoop("cerebras", "gpt-oss-120b")
+	// TestLoop("openrouter", "openai/gpt-4o")
+	// TestLoop("anthropic", "claude-sonnet-4-20250514")
+	// TestLoop("google", "gemini-2.5-flash")
+
+	// TestAll("review fs.go module in tools package of the Golang project in CWD")
+	TestAll("Get cwd")
+	// TestAll("Find the file containing IProvider definition and provide all functions of it")
 }

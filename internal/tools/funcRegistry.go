@@ -251,7 +251,7 @@ func (fr *FunctionRegistry) prepareArguments(fnType reflect.Type, paramNames []s
 	numIn := fnType.NumIn()
 	inArgs := make([]reflect.Value, numIn)
 
-	for i := 0; i < numIn; i++ {
+	for i := range numIn {
 		argType := fnType.In(i)
 		paramName := paramNames[i]
 		argValue, exists := args[paramName]
@@ -264,13 +264,21 @@ func (fr *FunctionRegistry) prepareArguments(fnType reflect.Type, paramNames []s
 		case reflect.String:
 			inArgs[i] = reflect.ValueOf(argValue)
 		case reflect.Int:
-			val, err := strconv.Atoi(argValue.(string))
+			argValueStr, ok := argValue.(string)
+			if !ok {
+				argValueStr = fmt.Sprintf("%v", argValue)
+			}
+			val, err := strconv.Atoi(argValueStr)
 			if err != nil {
-				return nil, fmt.Errorf("cannot convert %s to int: %v", argValue, err)
+				return nil, fmt.Errorf("cannot convert %s to int: %v", argValueStr, err)
 			}
 			inArgs[i] = reflect.ValueOf(val)
 		case reflect.Float64:
-			val, err := strconv.ParseFloat(argValue.(string), 64)
+			argValueStr, ok := argValue.(string)
+			if !ok {
+				argValueStr = fmt.Sprintf("%v", argValue)
+			}
+			val, err := strconv.ParseFloat(argValueStr, 64)
 			if err != nil {
 				return nil, fmt.Errorf("cannot convert %s to float64: %v", argValue, err)
 			}
