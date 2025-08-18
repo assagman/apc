@@ -131,7 +131,7 @@ func ToolTree(dir string, maxDepth int) (string, error) {
 	}
 	root := filepath.Join(cwd, filepath.Clean(dir))
 	if !strings.HasPrefix(root, cwd) {
-		return "", fmt.Errorf("listing outside project directory is not allowed")
+		return "", fmt.Errorf("listing outside of CWD is not allowed")
 	}
 
 	var sb strings.Builder

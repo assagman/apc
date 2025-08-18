@@ -10,7 +10,6 @@ import (
 	// "github.com/assagman/apc/internal/core"
 	"github.com/assagman/apc/internal/core"
 	"github.com/assagman/apc/internal/http"
-	"github.com/assagman/apc/internal/logger"
 	"github.com/assagman/apc/internal/tools"
 )
 
@@ -234,18 +233,6 @@ func (p *Provider) NewRequest() (core.GenericRequest, error) {
 		Tools:             p.Tools,
 		Contents:          p.History,
 	}, nil
-}
-
-func (p *Provider) GetTools() []tools.Tool {
-	fsTools, err := tools.GetFsTools()
-	if err != nil {
-		logger.Warning("Failed to get fs tools")
-	}
-	tools := make([]tools.Tool, 0)
-	for _, fsTool := range fsTools {
-		tools = append(tools, fsTool)
-	}
-	return tools
 }
 
 func (p *Provider) GetToolsAdapter(genericTools []tools.Tool) Tools {
