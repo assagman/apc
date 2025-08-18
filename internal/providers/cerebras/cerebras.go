@@ -34,6 +34,7 @@ type Provider struct {
 	Model        string
 	SystemPrompt string
 	History      []Message
+	Tools        []tools.Tool
 }
 
 type Part struct {
@@ -49,9 +50,9 @@ type Message struct {
 }
 
 type Request struct {
-	Model    string        `json:"model"`
-	Messages []Message     `json:"messages"`
-	Tools    *[]tools.Tool `json:"tools"`
+	Model    string       `json:"model"`
+	Messages []Message    `json:"messages"`
+	Tools    []tools.Tool `json:"tools"`
 }
 
 type Choice struct {
@@ -79,8 +80,10 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 		Model:        model,
 		SystemPrompt: systemPrompt,
 		History:      make([]Message, 0),
+		Tools:        make([]tools.Tool, 0),
 	}
 	p.History = append(p.History, p.ConstructSystemPromptMessage())
+	p.Tools = append(p.Tools, p.GetTools()...)
 	return p, nil
 }
 
@@ -190,7 +193,7 @@ func (p *Provider) IsToolCallValid(toolCall tools.ToolCall) (bool, error) {
 func (p *Provider) NewRequest() (core.GenericRequest, error) {
 	return Request{
 		Model:    p.Model,
-		Tools:    p.GetTools(),
+		Tools:    p.Tools,
 		Messages: p.History,
 	}, nil
 }
@@ -215,7 +218,7 @@ func (m *Message) GetContentAsArray() ([]Part, error) {
 	return nil, fmt.Errorf("[GetContentAsString: []Part cast failed]")
 }
 
-func (p *Provider) GetTools() *[]tools.Tool {
+func (p *Provider) GetTools() []tools.Tool {
 	fsTools, err := tools.GetFsTools()
 	if err != nil {
 		logger.Warning("Failed to get fs tools")
@@ -224,7 +227,7 @@ func (p *Provider) GetTools() *[]tools.Tool {
 	for _, fsTool := range fsTools {
 		tools = append(tools, fsTool)
 	}
-	return &tools
+	return tools
 }
 
 func (p *Provider) ConstructSystemPromptMessage() Message {

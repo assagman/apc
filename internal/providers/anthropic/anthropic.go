@@ -33,6 +33,7 @@ type Provider struct {
 	Model        string
 	SystemPrompt string
 	History      []Message
+	Tools        []Tool
 }
 
 type Message struct {
@@ -45,7 +46,7 @@ type Request struct {
 	Messages  []Message `json:"messages"`
 	MaxTokens int       `json:"max_tokens"`
 	System    string    `json:"system"`
-	Tools     Tools     `json:"tools"`
+	Tools     []Tool    `json:"tools"`
 }
 
 type ToolCall struct {
@@ -55,7 +56,7 @@ type ToolCall struct {
 }
 
 type Content struct {
-	Type              string          `json:"type,omitempty"`
+	Type              string          `json:"type,omitempty"` // text, tool_use
 	Text              string          `json:"text,omitempty"`
 	ToolId            string          `json:"id,omitempty"`
 	ToolUseId         string          `json:"tool_use_id,omitempty"`
@@ -76,8 +77,6 @@ type Tool struct {
 	InputSchema tools.ToolFunctionParameters `json:"input_schema"`
 }
 
-type Tools []Tool
-
 func CheckModelName(model string) error {
 	models := []string{"moonshotai/kimi-k2", "google/gemini-2.5-flash"}
 	if !slices.Contains(models, model) {
@@ -88,13 +87,16 @@ func CheckModelName(model string) error {
 
 func New(model string, systemPrompt string) (core.IProvider, error) {
 	CheckModelName(model)
-	return &Provider{
+	p := &Provider{
 		Name:         "anthropic",
 		Endpoint:     chatCompletionRequestUrl,
 		Model:        model,
 		SystemPrompt: systemPrompt,
 		History:      make([]Message, 0),
-	}, nil
+		Tools:        make([]Tool, 0),
+	}
+	p.Tools = append(p.Tools, p.GetToolsAdapter(p.GetTools())...)
+	return p, nil
 }
 
 func (p *Provider) GetApiKey() string { return os.Getenv("ANTHROPIC_API_KEY") }
@@ -128,8 +130,17 @@ func (p *Provider) GetAnswerFromResponse(resp core.GenericResponse) (string, err
 	if !ok {
 		return "", fmt.Errorf("[GetAnswerFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}
-	answer := response.Content[0].Text // TODO: content[0].type check
-	return answer, nil
+	if response.StopReason == stopReasonStop {
+		if len(response.Content) > 0 {
+			if response.Content[0].Type == "text" {
+				return response.Content[0].Text, nil
+			}
+			return "", fmt.Errorf("[GetAnswerFromResponse] Response.Content[0].Type -> expected `%s`, got: `%s`", "text", response.Content[0].Type)
+		}
+		return "", fmt.Errorf("[GetAnswerFromResponse] Empty Response.Content 🤔")
+	}
+
+	return "", fmt.Errorf("[GetAnswerFromResponse] Finish reason -> expected: `%s`, got: `%s`", stopReasonStop, response.StopReason)
 }
 
 func (p *Provider) GetFinishReasonFromResponse(resp core.GenericResponse) (string, error) {
@@ -220,13 +231,13 @@ func (p *Provider) NewRequest() (core.GenericRequest, error) {
 	return Request{
 		Model:     p.Model,
 		System:    p.SystemPrompt,
-		Tools:     *p.GetToolsAdapter(p.GetTools()),
+		Tools:     p.Tools,
 		Messages:  p.History,
 		MaxTokens: maxTokens,
 	}, nil
 }
 
-func (p *Provider) GetTools() *[]tools.Tool {
+func (p *Provider) GetTools() []tools.Tool {
 	fsTools, err := tools.GetFsTools()
 	if err != nil {
 		logger.Warning("Failed to get fs tools")
@@ -235,19 +246,19 @@ func (p *Provider) GetTools() *[]tools.Tool {
 	for _, fsTool := range fsTools {
 		tools = append(tools, fsTool)
 	}
-	return &tools
+	return tools
 }
 
-func (p *Provider) GetToolsAdapter(genericTools *[]tools.Tool) *Tools {
-	tools := make(Tools, 0)
-	for _, fsTool := range *genericTools {
+func (p *Provider) GetToolsAdapter(genericTools []tools.Tool) []Tool {
+	tools := make([]Tool, 0)
+	for _, fsTool := range genericTools {
 		tools = append(tools, Tool{
 			Name:        fsTool.Function.Name,
 			Description: fsTool.Function.Description,
 			InputSchema: fsTool.Function.Parameters,
 		})
 	}
-	return &tools
+	return tools
 }
 
 func (p *Provider) ConstructSystemPromptMessage() Message {

@@ -3,9 +3,6 @@ package tools
 func ConstructToolStruct(toolName string) Tool {
 	fnInfo := funcRegistry.functions[toolName]
 	description := fnInfo.description
-	if description == "" {
-		description = "Get unique id string" // Fallback if no doc comment
-	}
 
 	// Populate parameters from extracted info
 	properties := make(map[string]Property)

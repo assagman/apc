@@ -33,9 +33,10 @@ type FunctionRegistry struct {
 
 // NewFunctionRegistry creates a new FunctionRegistry
 func NewFunctionRegistry() *FunctionRegistry {
-	return &FunctionRegistry{
+	fr := &FunctionRegistry{
 		functions: make(map[string]FunctionInfo),
 	}
+	return fr
 }
 
 // RegisterFunction registers a function by extracting parameter names, types, and docs from source code

@@ -28,15 +28,18 @@ func LoadEnv(envFile string) error {
 }
 
 type APC struct {
+	// public
 	Provider core.IProvider
 	Model    string
-	chanWg   sync.WaitGroup
+	// private
+	chanWg sync.WaitGroup
 }
 
-type APCTools struct {
-	Filesystem []tools.Tool
-}
-
+// create new instance of APC
+//
+// providerName:
+// model:
+// systemPrompt:
 func New(providerName string, model string, systemPrompt string) (*APC, error) {
 	var provider core.IProvider
 	var err error

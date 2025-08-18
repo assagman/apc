@@ -2,6 +2,8 @@ package tools
 
 import "encoding/json"
 
+/* LLM PROVIDER GENERIC API TYPES */
+
 type Function struct {
 	Name      string          `json:"name"`
 	Arguments json.RawMessage `json:"arguments,omitempty"`
@@ -13,9 +15,9 @@ type ToolCall struct {
 }
 
 type Property struct {
-	Type        string   `json:"type,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Enum        []string `json:"enum,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Description string `json:"description,omitempty"`
+	// Enum        []string `json:"enum,omitempty"`
 }
 
 type ToolFunctionParameters struct {
@@ -31,6 +33,8 @@ type FunctionDefinition struct {
 }
 
 type Tool struct {
-	Type     string             `json:"type"`
+	Type     string             `json:"type"` // always = "function"
 	Function FunctionDefinition `json:"function"`
 }
+
+/* LLM PROVIDER GENERIC API TYPES */

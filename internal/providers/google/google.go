@@ -30,6 +30,7 @@ type Provider struct {
 	Model        string
 	SystemPrompt string
 	History      []Content
+	Tools        Tools
 }
 
 type Content struct {
@@ -62,7 +63,7 @@ type SystemInstruction struct {
 type Request struct {
 	SystemInstruction *SystemInstruction `json:"system_instruction,omitempty"`
 	Contents          []Content          `json:"contents"`
-	Tools             *Tools             `json:"tools"`
+	Tools             Tools              `json:"tools"`
 }
 
 type FunctionResponse struct {
@@ -90,13 +91,16 @@ func CheckModelName(model string) error {
 
 func New(model string, systemPrompt string) (core.IProvider, error) {
 	CheckModelName(model)
-	return &Provider{
+	p := &Provider{
 		Name:         "google",
 		Endpoint:     fmt.Sprintf(chatCompletionRequestUrlTemplate, model),
 		Model:        model,
 		SystemPrompt: systemPrompt,
 		History:      make([]Content, 0),
-	}, nil
+		Tools:        Tools{FunctionDeclarations: make([]Tool, 0)},
+	}
+	p.Tools = p.GetToolsAdapter(p.GetTools())
+	return p, nil
 }
 
 func (p *Provider) SetupChannels(ctx context.Context) {
@@ -227,12 +231,12 @@ func (p *Provider) IsToolCallValid(toolCall tools.ToolCall) (bool, error) {
 func (p *Provider) NewRequest() (core.GenericRequest, error) {
 	return Request{
 		SystemInstruction: p.GetSystemPrompt(),
-		Tools:             p.GetToolsAdapter(p.GetTools()),
+		Tools:             p.Tools,
 		Contents:          p.History,
 	}, nil
 }
 
-func (p *Provider) GetTools() *[]tools.Tool {
+func (p *Provider) GetTools() []tools.Tool {
 	fsTools, err := tools.GetFsTools()
 	if err != nil {
 		logger.Warning("Failed to get fs tools")
@@ -241,20 +245,20 @@ func (p *Provider) GetTools() *[]tools.Tool {
 	for _, fsTool := range fsTools {
 		tools = append(tools, fsTool)
 	}
-	return &tools
+	return tools
 }
 
-func (p *Provider) GetToolsAdapter(genericTools *[]tools.Tool) *Tools {
+func (p *Provider) GetToolsAdapter(genericTools []tools.Tool) Tools {
 	tools := Tools{}
 	tools.FunctionDeclarations = make([]Tool, 0)
-	for _, fsTool := range *genericTools {
+	for _, fsTool := range genericTools {
 		tools.FunctionDeclarations = append(tools.FunctionDeclarations, Tool{
 			Name:        fsTool.Function.Name,
 			Description: fsTool.Function.Description,
 			Parameters:  fsTool.Function.Parameters,
 		})
 	}
-	return &tools
+	return tools
 }
 
 func (p *Provider) ConstructSystemPromptMessage() Content {
