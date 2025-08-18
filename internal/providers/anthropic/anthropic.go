@@ -85,7 +85,7 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string) (core.IProvider, error) {
+func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
 	CheckModelName(model)
 	p := &Provider{
 		Name:         "anthropic",
@@ -95,7 +95,7 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 		History:      make([]Message, 0),
 		Tools:        make([]Tool, 0),
 	}
-	p.Tools = append(p.Tools, p.GetToolsAdapter(p.GetTools())...)
+	p.Tools = append(p.Tools, p.GetToolsAdapter(toolList)...)
 	return p, nil
 }
 

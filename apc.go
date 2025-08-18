@@ -27,6 +27,32 @@ func LoadEnv(envFile string) error {
 	return nil
 }
 
+// Tool Manager
+
+type APCTools struct {
+	tools []tools.Tool
+}
+
+func (t *APCTools) EnableFsTools() error {
+	fsTools, err := tools.GetFsTools()
+	if err != nil {
+		return err
+	}
+	t.tools = append(t.tools, fsTools...)
+	return nil
+}
+
+func (t *APCTools) RegisterTool(name string, fn any) error {
+	tool, err := tools.RegisterTool(name, fn)
+	if err != nil {
+		return err
+	}
+	t.tools = append(t.tools, tool)
+	return nil
+}
+
+// Tool Manager
+
 type APC struct {
 	// public
 	Provider core.IProvider
@@ -37,40 +63,40 @@ type APC struct {
 
 // create new instance of APC
 //
-// providerName:
-// model:
-// systemPrompt:
-func New(providerName string, model string, systemPrompt string) (*APC, error) {
+// providerName: openrouter, groq, cerebras, openai, google, anthropic
+// model: model name supported by the provider
+// systemPrompt: top-level system instructions for the chat
+func New(providerName string, model string, systemPrompt string, apcTools APCTools) (*APC, error) {
 	var provider core.IProvider
 	var err error
 	switch providerName {
 	case "openrouter":
-		provider, err = openrouter.New(model, systemPrompt)
+		provider, err = openrouter.New(model, systemPrompt, apcTools.tools)
 		if err != nil {
 			return nil, err
 		}
 	case "groq":
-		provider, err = groq.New(model, systemPrompt)
+		provider, err = groq.New(model, systemPrompt, apcTools.tools)
 		if err != nil {
 			return nil, err
 		}
 	case "cerebras":
-		provider, err = cerebras.New(model, systemPrompt)
+		provider, err = cerebras.New(model, systemPrompt, apcTools.tools)
 		if err != nil {
 			return nil, err
 		}
 	case "openai":
-		provider, err = openai.New(model, systemPrompt)
+		provider, err = openai.New(model, systemPrompt, apcTools.tools)
 		if err != nil {
 			return nil, err
 		}
 	case "google":
-		provider, err = google.New(model, systemPrompt)
+		provider, err = google.New(model, systemPrompt, apcTools.tools)
 		if err != nil {
 			return nil, err
 		}
 	case "anthropic":
-		provider, err = anthropic.New(model, systemPrompt)
+		provider, err = anthropic.New(model, systemPrompt, apcTools.tools)
 		if err != nil {
 			return nil, err
 		}

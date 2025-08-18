@@ -89,7 +89,7 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string) (core.IProvider, error) {
+func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
 	CheckModelName(model)
 	p := &Provider{
 		Name:         "google",
@@ -99,7 +99,7 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 		History:      make([]Content, 0),
 		Tools:        Tools{FunctionDeclarations: make([]Tool, 0)},
 	}
-	p.Tools = p.GetToolsAdapter(p.GetTools())
+	p.Tools = p.GetToolsAdapter(toolList)
 	return p, nil
 }
 

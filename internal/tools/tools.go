@@ -30,6 +30,14 @@ func ConstructToolStruct(toolName string) Tool {
 	}
 }
 
+func RegisterTool(funcName string, fn any) (Tool, error) {
+	if err := funcRegistry.RegisterFunction(funcName, fn); err != nil {
+		return Tool{}, err
+	}
+
+	return ConstructToolStruct(funcName), nil
+}
+
 func GetFsTools() ([]Tool, error) {
 	var tools []Tool
 	var funcMap = map[string]any{
@@ -39,10 +47,11 @@ func GetFsTools() ([]Tool, error) {
 		"ToolTree":                       ToolTree,
 	}
 	for funcName, fn := range funcMap {
-		if err := funcRegistry.RegisterFunction(funcName, fn); err != nil {
+		tool, err := RegisterTool(funcName, fn)
+		if err != nil {
 			return nil, err
 		}
-		tools = append(tools, ConstructToolStruct(funcName))
+		tools = append(tools, tool)
 	}
 	return tools, nil
 }

@@ -72,7 +72,7 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string) (core.IProvider, error) {
+func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
 	CheckModelName(model)
 	p := &Provider{
 		Name:         "groq",
@@ -80,10 +80,9 @@ func New(model string, systemPrompt string) (core.IProvider, error) {
 		Model:        model,
 		SystemPrompt: systemPrompt,
 		History:      make([]Message, 0),
-		Tools:        make([]tools.Tool, 0),
+		Tools:        toolList,
 	}
 	p.History = append(p.History, p.ConstructSystemPromptMessage())
-	p.Tools = append(p.Tools, *p.GetTools()...)
 	return p, nil
 }
 
