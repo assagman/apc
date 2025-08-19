@@ -60,7 +60,7 @@ func GetLogLevelAsInt(logLevel string) int {
 // NewLogger creates a new logger instance
 func NewLogger() *Logger {
 	return &Logger{
-		Level:  GetLogLevelAsInt(os.Getenv("LOGLEVEL")),
+		Level:  GetLogLevelAsInt(os.Getenv("LOG_LEVEL")),
 		writer: os.Stdout,
 	}
 }
