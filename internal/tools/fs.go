@@ -12,10 +12,17 @@ import (
 	"time"
 )
 
+type FS struct {
+	WD string
+}
+
 // ToolGetCurrentWorkingDirectory returns the current working directory(or so called project directory).
 // It's typically use for when it's asked to do operations regarding local filesystem, file operations,
 // statistics, etc.
-func ToolGetCurrentWorkingDirectory() (string, error) {
+func (fs *FS) ToolGetCurrentWorkingDirectory() (string, error) {
+	if fs.WD != "" {
+		return fs.WD, nil
+	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -29,7 +36,7 @@ func ToolGetCurrentWorkingDirectory() (string, error) {
 // includeHiddenFiles: bool flag to determine if hidden files are included or not. rg option `-.` is used when enabled
 // caseSensitive: bool flag to determine if search is performed dace sensitive or not. rg option `-sis used when enabled
 // dir: relative directory path to CWD, to perform ripgrep in `CWD/dir`.
-func ToolGrepText(text string, includeHiddenFiles bool, caseSensitive bool, dir string) (string, error) {
+func (fs *FS) ToolGrepText(text string, includeHiddenFiles bool, caseSensitive bool, dir string) (string, error) {
 	var args []string
 
 	// flags
@@ -49,7 +56,7 @@ func ToolGrepText(text string, includeHiddenFiles bool, caseSensitive bool, dir 
 	args = append(args, text)
 
 	// final arg is the directory to search
-	cwd, cwdErr := ToolGetCurrentWorkingDirectory()
+	cwd, cwdErr := fs.ToolGetCurrentWorkingDirectory()
 	if cwdErr != nil {
 		return "", fmt.Errorf("[ToolGrepText] Failed to get ToolGetCurrentWorkingDirectory output: %v", cwdErr)
 	}
@@ -86,7 +93,7 @@ func ToolGrepText(text string, includeHiddenFiles bool, caseSensitive bool, dir 
 // The path is treated as relative to the current working directory.
 //
 // filePath: relative path to the CWD
-func ToolReadFile(filePath string) (string, error) {
+func (fs *FS) ToolReadFile(filePath string) (string, error) {
 	filePath = strings.TrimSpace(filePath)
 	if filePath == "" {
 		return "", fmt.Errorf("path must not be empty")
@@ -95,7 +102,7 @@ func ToolReadFile(filePath string) (string, error) {
 	if filepath.Base(filePath) == ".env" {
 		return "", fmt.Errorf("Reading .env file is forbidden")
 	}
-	cwd, err := ToolGetCurrentWorkingDirectory()
+	cwd, err := fs.ToolGetCurrentWorkingDirectory()
 	if err != nil {
 		return "", fmt.Errorf("[ToolReadFile] failed to get cwd: %w", err)
 	}
@@ -118,11 +125,11 @@ func ToolReadFile(filePath string) (string, error) {
 //
 // dir: relative path to the CWD.
 // maxDepth: positive integer value represents how many level of nested directories included in tree
-func ToolTree(dir string, maxDepth int) (string, error) {
+func (fs *FS) ToolTree(dir string, maxDepth int) (string, error) {
 	if maxDepth < 1 {
 		return "", fmt.Errorf("[ToolTree] maxDepth must be a positive integer")
 	}
-	cwd, err := ToolGetCurrentWorkingDirectory()
+	cwd, err := fs.ToolGetCurrentWorkingDirectory()
 	if err != nil {
 		return "", fmt.Errorf("[ToolTree] failed to get cwd: %w", err)
 	}
@@ -130,9 +137,6 @@ func ToolTree(dir string, maxDepth int) (string, error) {
 		return "", fmt.Errorf("[ToolTree] dir must be relative to CWD.")
 	}
 	root := filepath.Join(cwd, filepath.Clean(dir))
-	if !strings.HasPrefix(root, cwd) {
-		return "", fmt.Errorf("listing outside of CWD is not allowed")
-	}
 
 	var sb strings.Builder
 	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {

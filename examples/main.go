@@ -67,7 +67,7 @@ func TestAllGetName() {
 func TestAllGetCWD() {
 	prompt := "get cwd"
 	apcTools := apc.APCTools{}
-	err := apcTools.EnableFsTools()
+	err := apcTools.EnableFsTools("/Users/sercans/source/me/vvvv/")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -97,6 +97,11 @@ func ToolGetMyName() (string, error) {
 func TestLoop(providerName string, modelName string) {
 	apcTools := apc.APCTools{}
 	err := apcTools.RegisterTool("ToolGetMyName", ToolGetMyName)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = apcTools.EnableFsTools("/Users/sercans/source/me/vvvv/")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -175,7 +180,7 @@ func main() {
 	// ctx, cancel := context.WithCancel(context.Background())
 	// defer cancel()
 
-	// TestLoop("openai", "gpt-4o")
+	TestLoop("openai", "gpt-4o")
 	// TestLoop("groq", "moonshotai/kimi-k2-instruct")
 	// TestLoop("cerebras", "gpt-oss-120b")
 	// TestLoop("openrouter", "openai/gpt-4o")
@@ -186,7 +191,7 @@ func main() {
 	// TestAll("Get cwd")
 	// TestAll("Find the file containing IProvider definition and provide all functions of it")
 	// TestAllGetName()
-	TestAllGetCWD()
+	// TestAllGetCWD()
 
 	// TestEnablingTool("google", "gemini-2.5-flash", "get cwd")
 	// TestEnablingTool("anthropic", "claude-sonnet-4-20250514", "get cwd")

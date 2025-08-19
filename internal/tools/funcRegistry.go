@@ -1,195 +1,261 @@
+// Package tools provides a FunctionRegistry that can register and execute
+// ordinary functions *and* methods on structs.
 package tools
 
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
-// ParamInfo holds information about a function parameter
+// ParamInfo holds JSON-schema style information for one parameter.
 type ParamInfo struct {
 	TypeName    string
 	Description string
 }
 
-// FunctionInfo holds the function, its parameter names, documentation, and param details
+// FunctionInfo stores everything needed to execute a registered function/method.
 type FunctionInfo struct {
-	fn          any
-	paramNames  []string
-	description string               // Main function description
-	paramInfos  map[string]ParamInfo // Parameter-specific info
+	fn          any                  // the function/method itself
+	receiver    reflect.Value        // receiver instance (for methods only)
+	paramNames  []string             // names of *user* parameters (no receiver)
+	description string               // doc comment above function/method
+	paramInfos  map[string]ParamInfo // per-parameter metadata
 }
 
-// FunctionRegistry holds a map of registered functions
+// FunctionRegistry keeps a map of registered functions/methods.
 type FunctionRegistry struct {
 	functions map[string]FunctionInfo
 }
 
-// NewFunctionRegistry creates a new FunctionRegistry
+// NewFunctionRegistry returns an empty registry.
 func NewFunctionRegistry() *FunctionRegistry {
-	return &FunctionRegistry{
-		functions: make(map[string]FunctionInfo),
-	}
+	return &FunctionRegistry{functions: make(map[string]FunctionInfo)}
 }
 
-// RegisterFunction registers a function by extracting parameter names, types, and docs from source code
+// ---------- registration helpers ------------------------------------------
+
+// RegisterFunction registers a standalone function.
 func (fr *FunctionRegistry) RegisterFunction(name string, fn any) error {
-	// Validate that fn is a function
+	return fr.register(name, fn, nil, nil)
+}
+
+// RegisterMethods registers every exported method on 'instance'.
+// Works for both value and pointer receivers.
+func (fr *FunctionRegistry) RegisterMethods(instance any) error {
+	val := reflect.ValueOf(instance)
+	typ := val.Type()
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return fmt.Errorf("RegisterMethods: expected *struct or struct, got %s", typ.Kind())
+	}
+
+	// 1. Load package that contains the type.
+	cfg := packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes,
+	}
+	pkgs, err := packages.Load(&cfg, typ.PkgPath())
+	if err != nil {
+		return fmt.Errorf("packages.Load: %w", err)
+	}
+	if len(pkgs) != 1 {
+		return fmt.Errorf("expected 1 package for %s, got %d", typ.PkgPath(), len(pkgs))
+	}
+	pkg := pkgs[0]
+
+	// 2. Build map: methodName -> *ast.FuncDecl
+	scope := pkg.Types.Scope().Lookup(typ.Name())
+	if scope == nil {
+		return fmt.Errorf("type %s not found in package", typ.Name())
+	}
+	// named := scope.Type().(*types.Named)
+
+	methodDecls := make(map[string]*ast.FuncDecl)
+	for _, file := range pkg.Syntax {
+		for _, d := range file.Decls {
+			fn, ok := d.(*ast.FuncDecl)
+			if ok && fn.Name.IsExported() && fn.Recv != nil {
+				if recvType(fn.Recv) == "*"+typ.Name() || recvType(fn.Recv) == typ.Name() {
+					methodDecls[fn.Name.Name] = fn
+				}
+			}
+		}
+	}
+
+	// 3. Register each method found via reflection.
+	for i := 0; i < reflect.TypeOf(instance).NumMethod(); i++ {
+		method := reflect.TypeOf(instance).Method(i)
+		decl, ok := methodDecls[method.Name]
+		if !ok {
+			// AST missing for this method (shouldn’t happen in normal builds)
+			continue
+		}
+		if err := fr.register(method.Name, method.Func.Interface(), decl, &val); err != nil {
+			return fmt.Errorf("method %s: %w", method.Name, err)
+		}
+	}
+	return nil
+}
+
+// register is the internal helper for both standalone functions and methods.
+func (fr *FunctionRegistry) register(name string, fn any, decl *ast.FuncDecl, receiver *reflect.Value) error {
 	fv := reflect.ValueOf(fn)
 	if fv.Kind() != reflect.Func {
-		return fmt.Errorf("provided value for %s is not a function", name)
+		return fmt.Errorf("%s is not a function", name)
 	}
+	ft := fv.Type()
 
-	// Get program counter (PC) for the function
-	pc := fv.Pointer()
-	rtFunc := runtime.FuncForPC(pc)
-	if rtFunc == nil {
-		return fmt.Errorf("could not find runtime function for %s", name)
-	}
-
-	// Get the file where the function is defined
-	file, _ := rtFunc.FileLine(pc)
-
-	// Determine the local function name from runtime
-	fullName := rtFunc.Name()
-	dotIdx := strings.LastIndex(fullName, ".")
-	localName := fullName
-	if dotIdx != -1 {
-		localName = fullName[dotIdx+1:]
-	}
-	if localName == "" {
-		return fmt.Errorf("could not determine local function name for %s", name)
-	}
-
-	// Parse the source file
-	src, err := os.ReadFile(file)
-	if err != nil {
-		return fmt.Errorf("failed to read source file %s: %v", file, err)
-	}
-
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, file, src, parser.ParseComments) // Enable comment parsing
-	if err != nil {
-		return fmt.Errorf("failed to parse source file %s: %v", file, err)
-	}
-
-	// Find the FuncDecl matching the name
-	var funcDecl *ast.FuncDecl
-	ast.Inspect(f, func(n ast.Node) bool {
-		if fd, ok := n.(*ast.FuncDecl); ok {
-			if fd.Name.Name == localName {
-				funcDecl = fd
-				return false
-			}
-		}
-		return true
-	})
-
-	if funcDecl == nil {
-		return fmt.Errorf("could not find function declaration for %s in %s", localName, file)
-	}
-
-	// Extract main description and parameter docs from comment
-	var description string
-	paramDocs := make(map[string]string)
-	if funcDecl.Doc != nil {
-		var inParamSection bool
-		var currentLines []string
-		for _, comment := range funcDecl.Doc.List {
-			line := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(comment.Text, "//"), "/*"))
-			line = strings.TrimSuffix(line, "*/")
-			if line == "" {
-				// Blank line separates main desc from param section
-				if !inParamSection && len(currentLines) > 0 {
-					description = strings.Join(currentLines, " ")
-					currentLines = nil
-					inParamSection = true
-				}
-				continue
-			}
-			if inParamSection {
-				// Look for "paramName: description"
-				if colonIdx := strings.Index(line, ":"); colonIdx != -1 {
-					paramName := strings.TrimSpace(line[:colonIdx])
-					paramDesc := strings.TrimSpace(line[colonIdx+1:])
-					paramDocs[paramName] = paramDesc
-				} else {
-					// Append to previous param desc if no colon
-					if len(paramDocs) > 0 {
-						lastParam := "" // Get last key
-						for k := range paramDocs {
-							lastParam = k
-						}
-						paramDocs[lastParam] += " " + line
-					}
-				}
-			} else {
-				currentLines = append(currentLines, line)
-			}
-		}
-		if !inParamSection && len(currentLines) > 0 {
-			description = strings.Join(currentLines, " ")
-		}
-	}
-
-	// Extract parameter names and types
-	paramNames := make([]string, 0)
+	// Collect parameter information.
+	var paramNames []string
 	paramInfos := make(map[string]ParamInfo)
-	fnType := fv.Type()
-	for i := 0; i < fnType.NumIn(); i++ {
-		argType := fnType.In(i)
-		// For param names, still extract from AST
-		if i >= len(funcDecl.Type.Params.List) {
-			return fmt.Errorf("parameter count mismatch in AST for %s", name)
+	if decl != nil { // method
+		for _, field := range decl.Type.Params.List {
+			for _, ident := range field.Names {
+				paramNames = append(paramNames, ident.Name)
+				paramInfos[ident.Name] = ParamInfo{
+					TypeName: mapGoTypeToJSONSchema(field.Type.(*ast.Ident).Name),
+				}
+			}
 		}
-		// Assuming single name per param for simplicity; adjust if variadic or multiple
-		paramList := funcDecl.Type.Params.List[i]
-		if len(paramList.Names) != 1 {
-			return fmt.Errorf("multiple names per param not supported for %s", name)
-		}
-		paramName := paramList.Names[0].Name
-		if paramName == "_" {
-			return fmt.Errorf("unnamed parameters (using _) are not supported for %s", name)
-		}
-		paramNames = append(paramNames, paramName)
-
-		// Get type as string from reflection (could use AST for more details)
-		typeName := mapGoTypeToJSONSchema(argType.String())
-
-		// Get param doc if available
-		paramDesc, ok := paramDocs[paramName]
-		if !ok {
-			paramDesc = "" // Default to empty
-		}
-
-		paramInfos[paramName] = ParamInfo{
-			TypeName:    typeName,
-			Description: paramDesc,
+	} else { // standalone function – simple reflection fallback
+		for i := 0; i < ft.NumIn(); i++ {
+			argName := fmt.Sprintf("arg%d", i)
+			paramNames = append(paramNames, argName)
+			paramInfos[argName] = ParamInfo{
+				TypeName: mapGoTypeToJSONSchema(ft.In(i).String()),
+			}
 		}
 	}
 
-	// Validate number of parameters
-	if len(paramNames) != fnType.NumIn() {
-		return fmt.Errorf("mismatch in parameter count for %s: expected %d, found %d names", name, fnType.NumIn(), len(paramNames))
+	desc := ""
+	if decl != nil && decl.Doc != nil {
+		desc = strings.TrimSpace(decl.Doc.Text())
 	}
 
-	// Store in registry
+	receiverVal := reflect.Value{} // zero for standalone functions
+	if receiver != nil {
+		receiverVal = *receiver
+	}
+
 	fr.functions[name] = FunctionInfo{
 		fn:          fn,
+		receiver:    receiverVal,
 		paramNames:  paramNames,
-		description: description,
+		description: desc,
 		paramInfos:  paramInfos,
 	}
 	return nil
 }
 
-// mapGoTypeToJSONSchema maps Go type strings to JSON schema types
+// ---------- execution -------------------------------------------------------
+
+// ExecFunc executes a registered function/method with named parameters.
+// Methods receive their receiver automatically.
+func (fr *FunctionRegistry) ExecFunc(funcName string, args map[string]any) (any, error) {
+	info, ok := fr.functions[funcName]
+	if !ok {
+		return nil, fmt.Errorf("function %s not found", funcName)
+	}
+
+	ft := reflect.TypeOf(info.fn)
+	if ft.NumOut() != 2 {
+		return nil, fmt.Errorf("function %s must return (result, error)", funcName)
+	}
+	if !ft.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+		return nil, fmt.Errorf("function %s second return must be error", funcName)
+	}
+
+	// Prepare only the user parameters (excluding receiver).
+	prepared, err := prepareArguments(ft, info.paramNames, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepend receiver for methods.
+	callArgs := make([]reflect.Value, 0, len(prepared)+1)
+	if info.receiver.IsValid() {
+		callArgs = append(callArgs, info.receiver)
+	}
+	callArgs = append(callArgs, prepared...)
+
+	results := reflect.ValueOf(info.fn).Call(callArgs)
+	if !results[1].IsNil() {
+		return nil, results[1].Interface().(error)
+	}
+	return results[0].Interface(), nil
+}
+
+// prepareArguments converts the user-provided map into a reflect.Value slice.
+func prepareArguments(fnType reflect.Type, paramNames []string, args map[string]any) ([]reflect.Value, error) {
+	out := make([]reflect.Value, len(paramNames))
+	for i, name := range paramNames {
+		val, ok := args[name]
+		if !ok {
+			return nil, fmt.Errorf("missing argument %q", name)
+		}
+
+		var (
+			argType reflect.Type
+			err     error
+		)
+		// Receiver (index 0) is handled by ExecFunc, so we always skip it.
+		argType = fnType.In(i + 1)
+
+		converted, err := convertArg(val, argType)
+		if err != nil {
+			return nil, fmt.Errorf("argument %q: %w", name, err)
+		}
+		out[i] = converted
+	}
+	return out, nil
+}
+
+// convertArg converts an interface{} value to the required reflect.Value.
+func convertArg(v any, target reflect.Type) (reflect.Value, error) {
+	switch target.Kind() {
+	case reflect.String:
+		return reflect.ValueOf(fmt.Sprint(v)), nil
+	case reflect.Int:
+		s := fmt.Sprint(v)
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf("cannot parse %q as int", s)
+		}
+		return reflect.ValueOf(i), nil
+	case reflect.Float64:
+		s := fmt.Sprint(v)
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return reflect.Value{}, fmt.Errorf("cannot parse %q as float", s)
+		}
+		return reflect.ValueOf(f), nil
+	case reflect.Bool:
+		switch t := v.(type) {
+		case bool:
+			return reflect.ValueOf(t), nil
+		case string:
+			b, err := strconv.ParseBool(t)
+			if err != nil {
+				return reflect.Value{}, fmt.Errorf("cannot parse %q as bool", t)
+			}
+			return reflect.ValueOf(b), nil
+		default:
+			return reflect.Value{}, fmt.Errorf("unsupported bool value type %T", v)
+		}
+	default:
+		return reflect.Value{}, fmt.Errorf("unsupported type %s", target)
+	}
+}
+
+// ---------- misc -----------------------------------------------------------
+
+// mapGoTypeToJSONSchema maps Go type strings to JSON schema types.
 func mapGoTypeToJSONSchema(goType string) string {
 	switch goType {
 	case "string":
@@ -200,110 +266,25 @@ func mapGoTypeToJSONSchema(goType string) string {
 		return "number"
 	case "bool":
 		return "boolean"
-	// Add more mappings as needed, e.g., slices -> array, structs -> object
 	default:
-		return "string" // Fallback
+		return "string"
 	}
 }
 
-// ExecFunc executes a registered function by name with provided named arguments
-func (fr *FunctionRegistry) ExecFunc(funcName string, args map[string]any) (any, error) {
-	// Check if function exists
-	fnInfo, exists := fr.functions[funcName]
-	if !exists {
-		return nil, fmt.Errorf("function %s not found", funcName)
+// recvType returns the string form of a method receiver.
+func recvType(r *ast.FieldList) string {
+	if r == nil || len(r.List) == 0 {
+		return ""
 	}
-
-	// Get function's reflection value and type
-	fnValue := reflect.ValueOf(fnInfo.fn)
-	fnType := fnValue.Type()
-
-	// Validate function signature: should return (interface{}, error)
-	if fnType.NumOut() != 2 {
-		return nil, fmt.Errorf("function %s must return (interface{}, error)", funcName)
-	}
-	if !fnType.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-		return nil, fmt.Errorf("function %s second return value must be error", funcName)
-	}
-
-	// Prepare arguments using extracted parameter names
-	inArgs, err := fr.prepareArguments(fnType, fnInfo.paramNames, args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare arguments: %v", err)
-	}
-
-	// Call the function
-	results := fnValue.Call(inArgs)
-
-	// Extract results
-	result := results[0].Interface()
-	errInterface := results[1].Interface()
-
-	if errInterface != nil {
-		return nil, errInterface.(error)
-	}
-
-	return result, nil
-}
-
-// prepareArguments converts string map arguments to the types expected by the function
-func (fr *FunctionRegistry) prepareArguments(fnType reflect.Type, paramNames []string, args map[string]any) ([]reflect.Value, error) {
-	numIn := fnType.NumIn()
-	inArgs := make([]reflect.Value, numIn)
-
-	for i := range numIn {
-		argType := fnType.In(i)
-		paramName := paramNames[i]
-		argValue, exists := args[paramName]
-		if !exists {
-			return nil, fmt.Errorf("missing argument %s", paramName)
+	switch t := r.List[0].Type.(type) {
+	case *ast.StarExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			return "*" + id.Name
 		}
-
-		// Convert string to appropriate type
-		switch argType.Kind() {
-		case reflect.String:
-			inArgs[i] = reflect.ValueOf(argValue)
-		case reflect.Int:
-			argValueStr, ok := argValue.(string)
-			if !ok {
-				argValueStr = fmt.Sprintf("%v", argValue)
-			}
-			val, err := strconv.Atoi(argValueStr)
-			if err != nil {
-				return nil, fmt.Errorf("cannot convert %s to int: %v", argValueStr, err)
-			}
-			inArgs[i] = reflect.ValueOf(val)
-		case reflect.Float64:
-			argValueStr, ok := argValue.(string)
-			if !ok {
-				argValueStr = fmt.Sprintf("%v", argValue)
-			}
-			val, err := strconv.ParseFloat(argValueStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("cannot convert %s to float64: %v", argValue, err)
-			}
-			inArgs[i] = reflect.ValueOf(val)
-		case reflect.Bool:
-			var val bool
-			var err error
-			switch v := argValue.(type) {
-			case bool:
-				val = v
-			case string:
-				val, err = strconv.ParseBool(v)
-				if err != nil {
-					return nil, fmt.Errorf("cannot convert %v to bool: %v", argValue, err)
-				}
-			default:
-				return nil, fmt.Errorf("unsupported arg value type %T for bool param %s", argValue, paramName)
-			}
-			inArgs[i] = reflect.ValueOf(val)
-		default:
-			return nil, fmt.Errorf("unsupported argument type %s for %s", argType.Kind(), paramName)
-		}
+	case *ast.Ident:
+		return t.Name
 	}
-
-	return inArgs, nil
+	return ""
 }
 
 var funcRegistry = NewFunctionRegistry()

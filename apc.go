@@ -33,8 +33,8 @@ type APCTools struct {
 	tools []tools.Tool
 }
 
-func (t *APCTools) EnableFsTools() error {
-	fsTools, err := tools.GetFsTools()
+func (t *APCTools) EnableFsTools(path string) error {
+	fsTools, err := tools.GetFsTools(path)
 	if err != nil {
 		return err
 	}

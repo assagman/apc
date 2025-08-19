@@ -1,5 +1,7 @@
 package tools
 
+import "github.com/assagman/apc/internal/logger"
+
 func ConstructToolStruct(toolName string) Tool {
 	fnInfo := funcRegistry.functions[toolName]
 	description := fnInfo.description
@@ -38,24 +40,39 @@ func RegisterTool(funcName string, fn any) (Tool, error) {
 	return ConstructToolStruct(funcName), nil
 }
 
-func GetFsTools() ([]Tool, error) {
+func GetFsTools(path string) ([]Tool, error) {
 	var tools []Tool
-	var funcMap = map[string]any{
-		"ToolGetCurrentWorkingDirectory": ToolGetCurrentWorkingDirectory,
-		"ToolGrepText":                   ToolGrepText,
-		"ToolReadFile":                   ToolReadFile,
-		"ToolTree":                       ToolTree,
+	fs := &FS{WD: path}
+	err := funcRegistry.RegisterMethods(fs)
+	if err != nil {
+		logger.Warning("%+w", err)
+	} else {
+		logger.Info("registry successfull")
 	}
-	for funcName, fn := range funcMap {
-		tool, err := RegisterTool(funcName, fn)
-		if err != nil {
-			return nil, err
-		}
-		tools = append(tools, tool)
+
+	fsMethods := []string{"ToolGetCurrentWorkingDirectory", "ToolGrepText", "ToolReadFile", "ToolTree"}
+	for _, name := range fsMethods {
+		tools = append(tools, ConstructToolStruct(name))
 	}
+
+	// var funcMap = map[string]any{
+	// 	"ToolGetCurrentWorkingDirectory": ToolGetCurrentWorkingDirectory,
+	// 	"ToolGrepText":                   ToolGrepText,
+	// 	"ToolReadFile":                   ToolReadFile,
+	// 	"ToolTree":                       ToolTree,
+	// }
+	// for funcName, fn := range funcMap {
+	// 	tool, err := RegisterTool(funcName, fn)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	tools = append(tools, tool)
+	// }
 	return tools, nil
 }
 
 func ExecTool(funcName string, args map[string]any) (any, error) {
+	logger.Debug(funcName)
+	logger.PrintV(args)
 	return funcRegistry.ExecFunc(funcName, args)
 }
