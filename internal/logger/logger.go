@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,18 +35,42 @@ var PrintMutex sync.Mutex
 
 // Logger is a simple custom logger
 type Logger struct {
+	Level  int
 	writer io.Writer
+}
+
+func GetLogLevelAsInt(logLevel string) int {
+	logLevel = strings.ToUpper(logLevel)
+	switch logLevel {
+	case "DEBUG":
+		return int(LevelDebug)
+	case "INFO":
+		return int(LevelInfo)
+	case "WARNING":
+		return int(LevelWarning)
+	case "ERROR":
+		return int(LevelError)
+	case "CRITICAL":
+		return int(LevelCritical)
+	default:
+		return int(LevelInfo)
+	}
 }
 
 // NewLogger creates a new logger instance
 func NewLogger() *Logger {
 	return &Logger{
+		Level:  GetLogLevelAsInt(os.Getenv("LOGLEVEL")),
 		writer: os.Stdout,
 	}
 }
 
 // log writes a log message with timestamp, severity, and color
 func (l *Logger) log(level LogLevel, msg string, args ...any) {
+	if level < LogLevel(l.Level) {
+		return
+	}
+
 	// Format the message if there are arguments
 	if len(args) > 0 {
 		msg = fmt.Sprintf(msg, args...)
