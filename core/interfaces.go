@@ -6,6 +6,41 @@ import (
 	"github.com/assagman/apc/internal/tools"
 )
 
+// openrouter only
+type SubProviderConfig struct {
+	AllowFallbacks bool     `json:"allow_fallbacks"`
+	Only           []string `json:"only"`
+}
+
+type ProviderConfig struct {
+	SubProvider  SubProviderConfig // openrouter only
+	Model        string
+	SystemPrompt string
+	APCTools     APCTools
+}
+
+type APCTools struct {
+	Tools []tools.Tool
+}
+
+func (t *APCTools) EnableFsTools(path string) error {
+	fsTools, err := tools.GetFsTools(path)
+	if err != nil {
+		return err
+	}
+	t.Tools = append(t.Tools, fsTools...)
+	return nil
+}
+
+func (t *APCTools) RegisterTool(name string, fn any) error {
+	tool, err := tools.RegisterTool(name, fn)
+	if err != nil {
+		return err
+	}
+	t.Tools = append(t.Tools, tool)
+	return nil
+}
+
 type GenericMessage any
 type GenericRequest any
 type GenericResponse any

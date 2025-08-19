@@ -9,8 +9,9 @@ import (
 	"os"
 	"slices"
 
-	"github.com/assagman/apc/internal/core"
+	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/http"
+	"github.com/assagman/apc/internal/logger"
 	"github.com/assagman/apc/internal/tools"
 )
 
@@ -29,12 +30,10 @@ const (
 )
 
 type Provider struct {
-	Name         string
-	Endpoint     string
-	Model        string
-	SystemPrompt string
-	History      []Message
-	Tools        []tools.Tool
+	Name     string
+	Endpoint string
+	Config   core.ProviderConfig
+	History  []Message
 }
 
 type Part struct {
@@ -50,9 +49,10 @@ type Message struct {
 }
 
 type Request struct {
-	Model    string       `json:"model"`
-	Messages []Message    `json:"messages"`
-	Tools    []tools.Tool `json:"tools"`
+	Model    string                 `json:"model"`
+	Messages []Message              `json:"messages"`
+	Tools    []tools.Tool           `json:"tools"`
+	Provider core.SubProviderConfig `json:"provider"`
 }
 
 type Choice struct {
@@ -72,15 +72,13 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
-	CheckModelName(model)
+func New(config core.ProviderConfig) (core.IProvider, error) {
+	CheckModelName(config.Model)
 	p := &Provider{
-		Name:         "openrouter",
-		Endpoint:     chatCompletionRequestUrl,
-		Model:        model,
-		SystemPrompt: systemPrompt,
-		History:      make([]Message, 0),
-		Tools:        toolList,
+		Name:     "openrouter",
+		Endpoint: chatCompletionRequestUrl,
+		History:  make([]Message, 0),
+		Config:   config,
 	}
 	p.History = append(p.History, p.ConstructSystemPromptMessage())
 	return p, nil
@@ -180,9 +178,10 @@ func (p *Provider) IsToolCallValid(toolCall tools.ToolCall) (bool, error) {
 
 func (p *Provider) NewRequest() (core.GenericRequest, error) {
 	return Request{
-		Model:    p.Model,
-		Tools:    p.Tools,
+		Model:    p.Config.Model,
+		Tools:    p.Config.APCTools.Tools,
 		Messages: p.History,
+		Provider: p.Config.SubProvider,
 	}, nil
 }
 
@@ -223,7 +222,7 @@ func (p *Provider) ConstructSystemPromptMessage() Message {
 		Content: []Part{
 			{
 				Type: "text",
-				Text: p.SystemPrompt,
+				Text: p.Config.SystemPrompt,
 			},
 		},
 	}
@@ -256,6 +255,7 @@ func (p *Provider) ConstructToolMessage(tooCall tools.ToolCall, toolResult strin
 
 func (p *Provider) SendRequest(ctx context.Context, request core.GenericRequest) (core.GenericResponse, error) {
 	req, ok := request.(Request)
+	logger.PrintV(req)
 	if !ok {
 		return nil, fmt.Errorf("[SendRequest] Failed to cast core.GenericRequest -> %s.Request", p.Name)
 	}

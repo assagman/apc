@@ -8,8 +8,9 @@ import (
 	"slices"
 
 	// "github.com/assagman/apc/internal/core"
-	"github.com/assagman/apc/internal/core"
+	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/http"
+	"github.com/assagman/apc/internal/logger"
 	"github.com/assagman/apc/internal/tools"
 )
 
@@ -88,17 +89,17 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
-	CheckModelName(model)
+func New(config core.ProviderConfig) (core.IProvider, error) {
+	CheckModelName(config.Model)
 	p := &Provider{
 		Name:         "google",
-		Endpoint:     fmt.Sprintf(chatCompletionRequestUrlTemplate, model),
-		Model:        model,
-		SystemPrompt: systemPrompt,
+		Endpoint:     fmt.Sprintf(chatCompletionRequestUrlTemplate, config.Model),
+		Model:        config.Model,
+		SystemPrompt: config.SystemPrompt,
 		History:      make([]Content, 0),
 		Tools:        Tools{FunctionDeclarations: make([]Tool, 0)},
 	}
-	p.Tools = p.GetToolsAdapter(toolList)
+	p.Tools = p.GetToolsAdapter(config.APCTools.Tools)
 	return p, nil
 }
 
@@ -124,6 +125,7 @@ func (p *Provider) AppendMessageHistory(msg core.GenericMessage) error {
 	}
 
 	p.History = append(p.History, message)
+	logger.PrintV(p.History)
 	return nil
 }
 
@@ -133,6 +135,7 @@ func (p *Provider) FinishReasonToolCall() string { return finishReasonStop }
 
 func (p *Provider) GetAnswerFromResponse(resp core.GenericResponse) (string, error) {
 	response, ok := resp.(Response)
+	logger.PrintV(response)
 	if !ok {
 		return "", fmt.Errorf("[GetAnswerFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}

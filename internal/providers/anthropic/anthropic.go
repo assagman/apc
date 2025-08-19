@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	// "github.com/assagman/apc/internal/core"
-	"github.com/assagman/apc/internal/core"
+	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/http"
 	"github.com/assagman/apc/internal/tools"
 )
@@ -84,17 +84,17 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
-	CheckModelName(model)
+func New(config core.ProviderConfig) (core.IProvider, error) {
+	CheckModelName(config.Model)
 	p := &Provider{
 		Name:         "anthropic",
 		Endpoint:     chatCompletionRequestUrl,
-		Model:        model,
-		SystemPrompt: systemPrompt,
+		Model:        config.Model,
+		SystemPrompt: config.SystemPrompt,
 		History:      make([]Message, 0),
 		Tools:        make([]Tool, 0),
 	}
-	p.Tools = append(p.Tools, p.GetToolsAdapter(toolList)...)
+	p.Tools = append(p.Tools, p.GetToolsAdapter(config.APCTools.Tools)...)
 	return p, nil
 }
 

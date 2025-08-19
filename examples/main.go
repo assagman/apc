@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/assagman/apc"
+	"github.com/assagman/apc/core"
 )
 
 var providerConfig = map[string]string{
@@ -20,9 +21,15 @@ var providerConfig = map[string]string{
 }
 
 func TestAll(prompt string) {
+	tools := core.APCTools{}
+	tools.EnableFsTools("")
 	for providerName, modelName := range providerConfig {
 		fmt.Println("---")
-		client, err := apc.New(providerName, modelName, "Always response in json format", apc.APCTools{})
+		client, err := apc.New(providerName, core.ProviderConfig{
+			Model:        modelName,
+			SystemPrompt: "Always response in json format",
+			APCTools:     tools,
+		})
 		if err != nil {
 			fmt.Printf("\n%v\n", err)
 			continue
@@ -40,7 +47,7 @@ func TestAll(prompt string) {
 
 func TestAllGetName() {
 	prompt := "get my name"
-	apcTools := apc.APCTools{}
+	apcTools := core.APCTools{}
 	err := apcTools.RegisterTool("ToolGetMyName", ToolGetMyName)
 	if err != nil {
 		fmt.Println(err)
@@ -48,7 +55,11 @@ func TestAllGetName() {
 	}
 	for providerName, modelName := range providerConfig {
 		fmt.Println("---")
-		client, err := apc.New(providerName, modelName, "Always response in json format", apcTools)
+		client, err := apc.New(providerName, core.ProviderConfig{
+			Model:        modelName,
+			SystemPrompt: "Always response in json format",
+			APCTools:     apcTools,
+		})
 		if err != nil {
 			fmt.Printf("\n%v\n", err)
 			continue
@@ -66,7 +77,7 @@ func TestAllGetName() {
 
 func TestAllGetCWD() {
 	prompt := "get cwd"
-	apcTools := apc.APCTools{}
+	apcTools := core.APCTools{}
 	err := apcTools.EnableFsTools("/Users/sercans/source/me/vvvv/")
 	if err != nil {
 		fmt.Println(err)
@@ -74,7 +85,11 @@ func TestAllGetCWD() {
 	}
 	for providerName, modelName := range providerConfig {
 		fmt.Println("---")
-		client, err := apc.New(providerName, modelName, "Always response in json format", apcTools)
+		client, err := apc.New(providerName, core.ProviderConfig{
+			Model:        modelName,
+			SystemPrompt: "Always response in json format",
+			APCTools:     apcTools,
+		})
 		if err != nil {
 			fmt.Printf("\n%v\n", err)
 			continue
@@ -95,7 +110,7 @@ func ToolGetMyName() (string, error) {
 }
 
 func TestLoop(providerName string, modelName string) {
-	apcTools := apc.APCTools{}
+	apcTools := core.APCTools{}
 	err := apcTools.RegisterTool("ToolGetMyName", ToolGetMyName)
 	if err != nil {
 		fmt.Println(err)
@@ -106,7 +121,11 @@ func TestLoop(providerName string, modelName string) {
 		fmt.Println(err)
 		return
 	}
-	client, err := apc.New(providerName, modelName, "Always write your response in bullet list", apcTools)
+	client, err := apc.New(providerName, core.ProviderConfig{
+		Model:        modelName,
+		SystemPrompt: "Always write your response in bullet list",
+		APCTools:     apcTools,
+	})
 	if err != nil {
 		fmt.Printf("\n%v\n", err)
 		return
@@ -131,43 +150,41 @@ func TestLoop(providerName string, modelName string) {
 	}
 }
 
-func TestEnablingTool(providerName string, modelName string, prompt string) {
-	// fmt.Println("Session WITHOUT tools")
-	// client, err := apc.New(providerName, modelName, "Always write your response in bullet list")
-	// if err != nil {
-	// 	fmt.Printf("\n%v\n", err)
-	// 	return
-	// }
-	// answer, err := client.Complete(context.TODO(), prompt)
-	// if err != nil {
-	// 	fmt.Printf("failed:\n\n")
-	// 	fmt.Printf("\n%v\n", err)
-	// }
-	// fmt.Printf("[AI]:\n%s\n\n", answer)
-	// fmt.Println("[END]")
-	//
-	// fmt.Println("Session WITH tools")
-	// if err := client.EnableFsTools(); err != nil {
-	// 	fmt.Printf("[WARNING] Failed to enable fs tools. Error: %v", err)
-	// 	return
-	// }
-	// answer, err = client.Complete(context.TODO(), prompt)
-	// if err != nil {
-	// 	fmt.Printf("failed:\n\n")
-	// 	fmt.Printf("\n%v\n", err)
-	// }
-	// fmt.Printf("[AI]:\n%s\n\n", answer)
-	// fmt.Println("[END]")
-	//
-	// fmt.Println("Session WITHOUT tools")
-	// client.DisableFsTools()
-	// answer, err = client.Complete(context.TODO(), prompt)
-	// if err != nil {
-	// 	fmt.Printf("failed:\n\n")
-	// 	fmt.Printf("\n%v\n", err)
-	// }
-	// fmt.Printf("[AI]:\n%s\n\n", answer)
-	// fmt.Println("[END]")
+func TestOpenrouterSubProvider() {
+	apcTools := core.APCTools{}
+	apcTools.EnableFsTools("")
+	client, err := apc.New("openrouter", core.ProviderConfig{
+		Model:        "qwen/qwen3-coder",
+		SystemPrompt: "Always write your response in bullet list",
+		APCTools:     apcTools,
+		SubProvider: core.SubProviderConfig{
+			AllowFallbacks: false,
+			Only:           []string{"Cerebras"},
+		},
+	})
+	if err != nil {
+		fmt.Printf("\n%v\n", err)
+		return
+	}
+
+	for {
+		var prompt string
+		fmt.Print(">> Prompt: ")
+		reader := bufio.NewReader(os.Stdin)
+		prompt, err := reader.ReadString('±')
+		prompt = strings.TrimRight(prompt, "±")
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+		answer, err := client.Complete(context.TODO(), prompt)
+		if err != nil {
+			fmt.Printf("failed:\n\n")
+			fmt.Printf("\n%v\n", err)
+			continue
+		}
+		fmt.Printf("[AI]:\n%s\n\n", answer)
+	}
 }
 
 func main() {
@@ -180,7 +197,7 @@ func main() {
 	// ctx, cancel := context.WithCancel(context.Background())
 	// defer cancel()
 
-	TestLoop("openai", "gpt-4o")
+	// TestLoop("openai", "gpt-4o")
 	// TestLoop("groq", "moonshotai/kimi-k2-instruct")
 	// TestLoop("cerebras", "gpt-oss-120b")
 	// TestLoop("openrouter", "openai/gpt-4o")
@@ -189,11 +206,12 @@ func main() {
 
 	// TestAll("review fs.go module in tools package of the Golang project in CWD")
 	// TestAll("Get cwd")
-	// TestAll("Find the file containing IProvider definition and provide all functions of it")
+	TestAll("Find the file containing IProvider definition and provide all functions of it")
 	// TestAllGetName()
 	// TestAllGetCWD()
 
 	// TestEnablingTool("google", "gemini-2.5-flash", "get cwd")
 	// TestEnablingTool("anthropic", "claude-sonnet-4-20250514", "get cwd")
 
+	// TestOpenrouterSubProvider()
 }

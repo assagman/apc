@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	// "github.com/assagman/apc/internal/core"
-	"github.com/assagman/apc/internal/core"
+	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/http"
 	"github.com/assagman/apc/internal/tools"
 )
@@ -71,15 +71,15 @@ func CheckModelName(model string) error {
 	return nil
 }
 
-func New(model string, systemPrompt string, toolList []tools.Tool) (core.IProvider, error) {
-	CheckModelName(model)
+func New(config core.ProviderConfig) (core.IProvider, error) {
+	CheckModelName(config.Model)
 	p := &Provider{
 		Name:         "cerebras",
 		Endpoint:     chatCompletionRequestUrl,
-		Model:        model,
-		SystemPrompt: systemPrompt,
+		Model:        config.Model,
+		SystemPrompt: config.SystemPrompt,
 		History:      make([]Message, 0),
-		Tools:        toolList,
+		Tools:        config.APCTools.Tools,
 	}
 	p.History = append(p.History, p.ConstructSystemPromptMessage())
 	return p, nil

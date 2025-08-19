@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/assagman/apc/internal/core"
+	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/environ"
 	"github.com/assagman/apc/internal/logger"
 
@@ -27,36 +27,10 @@ func LoadEnv(envFile string) error {
 	return nil
 }
 
-// Tool Manager
-
-type APCTools struct {
-	tools []tools.Tool
-}
-
-func (t *APCTools) EnableFsTools(path string) error {
-	fsTools, err := tools.GetFsTools(path)
-	if err != nil {
-		return err
-	}
-	t.tools = append(t.tools, fsTools...)
-	return nil
-}
-
-func (t *APCTools) RegisterTool(name string, fn any) error {
-	tool, err := tools.RegisterTool(name, fn)
-	if err != nil {
-		return err
-	}
-	t.tools = append(t.tools, tool)
-	return nil
-}
-
-// Tool Manager
-
 type APC struct {
 	// public
-	Provider core.IProvider
-	Model    string
+	Provider       core.IProvider
+	ProviderConfig core.ProviderConfig
 	// private
 	chanWg sync.WaitGroup
 }
@@ -66,37 +40,38 @@ type APC struct {
 // providerName: openrouter, groq, cerebras, openai, google, anthropic
 // model: model name supported by the provider
 // systemPrompt: top-level system instructions for the chat
-func New(providerName string, model string, systemPrompt string, apcTools APCTools) (*APC, error) {
+// apcTools: The tools that will be registered and enabled to the model
+func New(providerName string, providerConfig core.ProviderConfig) (*APC, error) {
 	var provider core.IProvider
 	var err error
 	switch providerName {
 	case "openrouter":
-		provider, err = openrouter.New(model, systemPrompt, apcTools.tools)
+		provider, err = openrouter.New(providerConfig)
 		if err != nil {
 			return nil, err
 		}
 	case "groq":
-		provider, err = groq.New(model, systemPrompt, apcTools.tools)
+		provider, err = groq.New(providerConfig)
 		if err != nil {
 			return nil, err
 		}
 	case "cerebras":
-		provider, err = cerebras.New(model, systemPrompt, apcTools.tools)
+		provider, err = cerebras.New(providerConfig)
 		if err != nil {
 			return nil, err
 		}
 	case "openai":
-		provider, err = openai.New(model, systemPrompt, apcTools.tools)
+		provider, err = openai.New(providerConfig)
 		if err != nil {
 			return nil, err
 		}
 	case "google":
-		provider, err = google.New(model, systemPrompt, apcTools.tools)
+		provider, err = google.New(providerConfig)
 		if err != nil {
 			return nil, err
 		}
 	case "anthropic":
-		provider, err = anthropic.New(model, systemPrompt, apcTools.tools)
+		provider, err = anthropic.New(providerConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -104,8 +79,8 @@ func New(providerName string, model string, systemPrompt string, apcTools APCToo
 		return nil, fmt.Errorf("Unsupported provider: %s", providerName)
 	}
 	apc := APC{
-		Provider: provider,
-		Model:    model,
+		Provider:       provider,
+		ProviderConfig: providerConfig,
 	}
 
 	return &apc, nil

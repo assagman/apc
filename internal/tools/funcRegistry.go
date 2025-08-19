@@ -49,7 +49,7 @@ func (fr *FunctionRegistry) RegisterFunction(name string, fn any) error {
 func (fr *FunctionRegistry) RegisterMethods(instance any) error {
 	val := reflect.ValueOf(instance)
 	typ := val.Type()
-	if typ.Kind() == reflect.Ptr {
+	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 	if typ.Kind() != reflect.Struct {
