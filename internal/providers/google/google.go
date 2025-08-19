@@ -10,7 +10,6 @@ import (
 	// "github.com/assagman/apc/internal/core"
 	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/http"
-	"github.com/assagman/apc/internal/logger"
 	"github.com/assagman/apc/internal/tools"
 )
 
@@ -125,7 +124,6 @@ func (p *Provider) AppendMessageHistory(msg core.GenericMessage) error {
 	}
 
 	p.History = append(p.History, message)
-	logger.PrintV(p.History)
 	return nil
 }
 
@@ -135,7 +133,6 @@ func (p *Provider) FinishReasonToolCall() string { return finishReasonStop }
 
 func (p *Provider) GetAnswerFromResponse(resp core.GenericResponse) (string, error) {
 	response, ok := resp.(Response)
-	logger.PrintV(response)
 	if !ok {
 		return "", fmt.Errorf("[GetAnswerFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/assagman/apc/internal/logger"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -46,14 +47,14 @@ func (fr *FunctionRegistry) RegisterFunction(name string, fn any) error {
 
 // RegisterMethods registers every exported method on 'instance'.
 // Works for both value and pointer receivers.
-func (fr *FunctionRegistry) RegisterMethods(instance any) error {
+func (fr *FunctionRegistry) RegisterMethods(instance any) ([]string, error) {
 	val := reflect.ValueOf(instance)
 	typ := val.Type()
 	if typ.Kind() == reflect.Pointer {
 		typ = typ.Elem()
 	}
 	if typ.Kind() != reflect.Struct {
-		return fmt.Errorf("RegisterMethods: expected *struct or struct, got %s", typ.Kind())
+		return nil, fmt.Errorf("RegisterMethods: expected *struct or struct, got %s", typ.Kind())
 	}
 
 	// 1. Load package that contains the type.
@@ -62,17 +63,18 @@ func (fr *FunctionRegistry) RegisterMethods(instance any) error {
 	}
 	pkgs, err := packages.Load(&cfg, typ.PkgPath())
 	if err != nil {
-		return fmt.Errorf("packages.Load: %w", err)
+		return nil, fmt.Errorf("packages.Load: %w", err)
 	}
 	if len(pkgs) != 1 {
-		return fmt.Errorf("expected 1 package for %s, got %d", typ.PkgPath(), len(pkgs))
+		return nil, fmt.Errorf("expected 1 package for %s, got %d", typ.PkgPath(), len(pkgs))
 	}
 	pkg := pkgs[0]
 
 	// 2. Build map: methodName -> *ast.FuncDecl
+
 	scope := pkg.Types.Scope().Lookup(typ.Name())
 	if scope == nil {
-		return fmt.Errorf("type %s not found in package", typ.Name())
+		return nil, fmt.Errorf("type `%s` not found in package `%s`", typ.Name(), pkg)
 	}
 	// named := scope.Type().(*types.Named)
 
@@ -89,18 +91,23 @@ func (fr *FunctionRegistry) RegisterMethods(instance any) error {
 	}
 
 	// 3. Register each method found via reflection.
+	var methodNames []string
+	logger.Debug("%d", reflect.TypeOf(instance).NumMethod())
 	for i := 0; i < reflect.TypeOf(instance).NumMethod(); i++ {
 		method := reflect.TypeOf(instance).Method(i)
 		decl, ok := methodDecls[method.Name]
 		if !ok {
+			logger.Warning("AST is missing")
 			// AST missing for this method (shouldn’t happen in normal builds)
 			continue
 		}
 		if err := fr.register(method.Name, method.Func.Interface(), decl, &val); err != nil {
-			return fmt.Errorf("method %s: %w", method.Name, err)
+			return nil, fmt.Errorf("method %s: %w", method.Name, err)
 		}
+		methodNames = append(methodNames, method.Name)
 	}
-	return nil
+	logger.PrintV(methodNames)
+	return methodNames, nil
 }
 
 // register is the internal helper for both standalone functions and methods.

@@ -11,7 +11,6 @@ import (
 
 	"github.com/assagman/apc/core"
 	"github.com/assagman/apc/internal/http"
-	"github.com/assagman/apc/internal/logger"
 	"github.com/assagman/apc/internal/tools"
 )
 
@@ -255,7 +254,6 @@ func (p *Provider) ConstructToolMessage(tooCall tools.ToolCall, toolResult strin
 
 func (p *Provider) SendRequest(ctx context.Context, request core.GenericRequest) (core.GenericResponse, error) {
 	req, ok := request.(Request)
-	logger.PrintV(req)
 	if !ok {
 		return nil, fmt.Errorf("[SendRequest] Failed to cast core.GenericRequest -> %s.Request", p.Name)
 	}

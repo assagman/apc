@@ -41,6 +41,17 @@ func (t *APCTools) RegisterTool(name string, fn any) error {
 	return nil
 }
 
+func (t *APCTools) RegisterMethods(inst any) error {
+	methodTools, err := tools.RegisterMethods(inst)
+	if err != nil {
+		return err
+	}
+	for _, tool := range methodTools {
+		t.Tools = append(t.Tools, tool)
+	}
+	return nil
+}
+
 type GenericMessage any
 type GenericRequest any
 type GenericResponse any

@@ -1,6 +1,8 @@
 package tools
 
-import "github.com/assagman/apc/internal/logger"
+import (
+	"github.com/assagman/apc/internal/logger"
+)
 
 func ConstructToolStruct(toolName string) Tool {
 	fnInfo := funcRegistry.functions[toolName]
@@ -40,18 +42,32 @@ func RegisterTool(funcName string, fn any) (Tool, error) {
 	return ConstructToolStruct(funcName), nil
 }
 
+func RegisterMethods(inst any) ([]Tool, error) {
+	methods, err := funcRegistry.RegisterMethods(inst)
+	if err != nil {
+		return nil, err
+	} else {
+		logger.Info("registry successfull")
+	}
+	logger.PrintV(methods)
+	var tools []Tool
+	for _, name := range methods {
+		tools = append(tools, ConstructToolStruct(name))
+	}
+	return tools, nil
+}
+
 func GetFsTools(path string) ([]Tool, error) {
 	var tools []Tool
 	fs := &FS{WD: path}
-	err := funcRegistry.RegisterMethods(fs)
+	methods, err := funcRegistry.RegisterMethods(fs)
 	if err != nil {
 		logger.Warning("%+w", err)
 	} else {
 		logger.Info("registry successfull")
 	}
 
-	fsMethods := []string{"ToolGetCurrentWorkingDirectory", "ToolGrepText", "ToolReadFile", "ToolTree"}
-	for _, name := range fsMethods {
+	for _, name := range methods {
 		tools = append(tools, ConstructToolStruct(name))
 	}
 

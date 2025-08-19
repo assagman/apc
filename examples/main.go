@@ -9,6 +9,7 @@ import (
 
 	"github.com/assagman/apc"
 	"github.com/assagman/apc/core"
+	"github.com/assagman/apc/examples/exampleTools"
 )
 
 var providerConfig = map[string]string{
@@ -187,6 +188,46 @@ func TestOpenrouterSubProvider() {
 	}
 }
 
+func TestRegisterMethods() {
+	apcTools := core.APCTools{}
+	tb := &exampleTools.ToolBox{}
+	err := apcTools.RegisterMethods(tb)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+	client, err := apc.New("openrouter", core.ProviderConfig{
+		Model:        "qwen/qwen3-coder",
+		SystemPrompt: "Always write your response in bullet list",
+		APCTools:     apcTools,
+		SubProvider: core.SubProviderConfig{
+			AllowFallbacks: false,
+			Only:           []string{"Cerebras"},
+		},
+	})
+	if err != nil {
+		fmt.Printf("\n%v\n", err)
+		return
+	}
+	for {
+		var prompt string
+		fmt.Print(">> Prompt: ")
+		reader := bufio.NewReader(os.Stdin)
+		prompt, err := reader.ReadString('±')
+		prompt = strings.TrimRight(prompt, "±")
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+		answer, err := client.Complete(context.TODO(), prompt)
+		if err != nil {
+			fmt.Printf("failed:\n\n")
+			fmt.Printf("\n%v\n", err)
+			continue
+		}
+		fmt.Printf("[AI]:\n%s\n\n", answer)
+	}
+}
+
 func main() {
 	fmt.Println("Starting examples main")
 	if err := apc.LoadEnv(".env"); err != nil {
@@ -206,7 +247,7 @@ func main() {
 
 	// TestAll("review fs.go module in tools package of the Golang project in CWD")
 	// TestAll("Get cwd")
-	TestAll("Find the file containing IProvider definition and provide all functions of it")
+	// TestAll("Find the file containing IProvider definition and provide all functions of it")
 	// TestAllGetName()
 	// TestAllGetCWD()
 
@@ -214,4 +255,5 @@ func main() {
 	// TestEnablingTool("anthropic", "claude-sonnet-4-20250514", "get cwd")
 
 	// TestOpenrouterSubProvider()
+	TestRegisterMethods()
 }
