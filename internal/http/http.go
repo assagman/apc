@@ -76,8 +76,9 @@ func (c *BaseHttpClient) Post(ctx context.Context, url string, headers map[strin
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 429 { // too many requests
-			sleepTime := 5 * time.Second
-			logger.Warning("Request status code: %d. Retrying after %d", resp.StatusCode, sleepTime)
+			sleepSeconds := 5
+			sleepTime := time.Duration(sleepSeconds) * time.Second
+			logger.Warning("Request status code: %d. Retrying after %d second(s)", resp.StatusCode, sleepTime)
 			time.Sleep(sleepTime)
 			return c.Post(ctx, url, headers, body)
 		}
