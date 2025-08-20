@@ -7,6 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"time"
+
+	"github.com/assagman/apc/internal/logger"
 )
 
 type BaseHttpClient struct {
@@ -72,6 +75,12 @@ func (c *BaseHttpClient) Post(ctx context.Context, url string, headers map[strin
 	}
 
 	if resp.StatusCode != 200 {
+		if resp.StatusCode == 429 { // too many requests
+			sleepTime := 5 * time.Second
+			logger.Warning("Request status code: %d. Retrying after %d", resp.StatusCode, sleepTime)
+			time.Sleep(sleepTime)
+			return c.Post(ctx, url, headers, body)
+		}
 		return respBytes, fmt.Errorf("Non-200 POST request. Status: %s.\nResponse dump:\n\n%s\n", resp.Status, string(respDump))
 	}
 

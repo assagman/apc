@@ -153,7 +153,7 @@ func TestLoop(providerName string, modelName string) {
 
 func TestOpenrouterSubProvider() {
 	apcTools := core.APCTools{}
-	apcTools.EnableFsTools("")
+	// apcTools.EnableFsTools("")
 	client, err := apc.New("openrouter", core.ProviderConfig{
 		Model:        "qwen/qwen3-coder",
 		SystemPrompt: "Always write your response in bullet list",

@@ -135,13 +135,12 @@ func (apc *APC) ProcessRequest(ctx context.Context, reqChan <-chan core.GenericR
 	defer apc.chanWg.Done()
 
 	for req := range reqChan {
-		logger.Info("[ProcessRequest] 📤 Sending request...")
+		logger.Info("[ProcessRequest] ⏳ Awaiting response...")
 		resp, err := apc.Provider.SendRequest(ctx, req)
 		if err != nil {
 			errChan <- err
 			continue
 		}
-		logger.Info("[ProcessRequest] ✅ Request sent")
 		respChan <- resp
 	}
 }
@@ -207,6 +206,7 @@ func (apc *APC) ProcessToolCall(ctx context.Context, toolCallChan <-chan []tools
 			msgHistoryChan <- toolMessages
 		} else {
 			logger.Warning("\t\t\t[ProcessToolCall] ⚠️ No tool message constructed")
+			// TODO: compare tool name(s) with registered tools, validate it. if tool name(s) are wrong, retry it
 		}
 	}
 }
