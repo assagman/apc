@@ -102,11 +102,14 @@ func (p *Provider) GetAnswerFromResponse(resp core.GenericResponse) (string, err
 	if !ok {
 		return "", fmt.Errorf("[GetAnswerFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}
-	answer, err := response.Choices[0].Message.GetContentAsString()
-	if err != nil {
-		return "", fmt.Errorf("Failed to GetContentAsString: ")
+	if len(response.Choices) > 0 {
+		answer, err := response.Choices[0].Message.GetContentAsString()
+		if err != nil {
+			return "", fmt.Errorf("Failed to GetContentAsString: ")
+		}
+		return answer, nil
 	}
-	return answer, nil
+	return "", fmt.Errorf("[GetAnswerFromResponse][%s] Empty choices in response", p.Name)
 }
 
 func (p *Provider) GetFinishReasonFromResponse(resp core.GenericResponse) (string, error) {
@@ -114,7 +117,11 @@ func (p *Provider) GetFinishReasonFromResponse(resp core.GenericResponse) (strin
 	if !ok {
 		return "", fmt.Errorf("[GetFinishReasonFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}
-	return response.Choices[0].FinishReason, nil
+
+	if len(response.Choices) > 0 {
+		return response.Choices[0].FinishReason, nil
+	}
+	return "", fmt.Errorf("[GetFinishReasonFromResponse][%s] Empty choices in response", p.Name)
 }
 
 func (p *Provider) GetMessageFromResponse(resp core.GenericResponse) (core.GenericMessage, error) {
@@ -122,7 +129,10 @@ func (p *Provider) GetMessageFromResponse(resp core.GenericResponse) (core.Gener
 	if !ok {
 		return nil, fmt.Errorf("[GetMessageFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}
-	return response.Choices[0].Message, nil
+	if len(response.Choices) > 0 {
+		return response.Choices[0].Message, nil
+	}
+	return "", fmt.Errorf("[GetMessageFromResponse][%s] Empty choices in response", p.Name)
 }
 
 func (p *Provider) GetToolCallsFromResponse(resp core.GenericResponse) ([]tools.ToolCall, error) {
@@ -130,7 +140,10 @@ func (p *Provider) GetToolCallsFromResponse(resp core.GenericResponse) ([]tools.
 	if !ok {
 		return nil, fmt.Errorf("[GetToolCallsFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}
-	return response.Choices[0].Message.ToolCalls, nil
+	if len(response.Choices) > 0 {
+		return response.Choices[0].Message.ToolCalls, nil
+	}
+	return nil, fmt.Errorf("[GetToolCallsFromResponse][%s] Empty choices in response", p.Name)
 }
 
 func (p *Provider) GetMessageHistory() any {

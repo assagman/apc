@@ -148,7 +148,11 @@ func (p *Provider) GetFinishReasonFromResponse(resp core.GenericResponse) (strin
 	if !ok {
 		return "", fmt.Errorf("[GetFinishReasonFromResponse] Failed to cast core.GenericResponse -> %s.Response", p.Name)
 	}
-	return response.Candidates[0].FinishReason, nil
+	if len(response.Candidates) > 0 {
+		return response.Candidates[0].FinishReason, nil
+	}
+	return "", fmt.Errorf("[GetMessageFromResponse][%s] Empty candidates in response", p.Name)
+
 }
 
 func (p *Provider) GetMessageFromResponse(resp core.GenericResponse) (core.GenericMessage, error) {
@@ -156,7 +160,10 @@ func (p *Provider) GetMessageFromResponse(resp core.GenericResponse) (core.Gener
 	if !ok {
 		return nil, fmt.Errorf("[GetMessageFromResponse] Failed to cast core.GenericResponse -> %s.Response\n", p.Name)
 	}
-	return response.Candidates[0].Content, nil
+	if len(response.Candidates) > 0 {
+		return response.Candidates[0].Content, nil
+	}
+	return "", fmt.Errorf("[GetMessageFromResponse][%s] Empty candidates in response", p.Name)
 }
 
 func (p *Provider) GetToolCallsFromResponse(resp core.GenericResponse) ([]tools.ToolCall, error) {
